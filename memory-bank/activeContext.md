@@ -81,4 +81,23 @@ YYYY-MM-DD HH:MM:SS - Log of updates made.
 [2025-05-03 15:32:25] - Recent Changes: Successfully implemented the channel name deduplication fix by modifying the exploreChannelNamesArea function in utils.cpp to use std::set instead of std::vector for storing channel names. Also improved the calculation of total stereo channels to use the number of unique channel numbers rather than dividing the total number of stereo channel names by 2. The scanner now correctly reports unique channel names without duplicates.
 [2025-05-03 15:32:25] - Open Questions/Issues: What's the next priority in the scanner improvement plan? Should we focus on improving the RX/TX register reading or implementing cross-validation between channel names and stream information? How can we extract more coherent bits from the registers to better understand the device's capabilities?
 [2025-05-03 16:41:10] - Current Focus: Integrating new register reading functions into `src/tools/scanner/dice_helpers.cpp`.
+[2025-05-04 01:08:50] - Current Focus: Fixed format on save functionality for C/C++ files.
+[2025-05-04 01:08:50] - Recent Changes: Installed clang-format via Homebrew, updated VSCode settings to explicitly point to the clang-format executable, disabled Prettier for C/C++ files to avoid conflicts, and enabled "Fix All" code actions on save.
+[2025-05-04 01:08:50] - Open Questions/Issues: None. Format on save should now work correctly for C/C++ files.
 [2025-05-03 16:41:10] - Open Questions/Issues: Unable to apply diff to `src/tools/scanner/dice_helpers.cpp` due to persistent formatting errors in the diff content. Need to investigate the cause of the diff application failure.
+[2025-05-04 01:11:45] - Current Focus: Updated .clang-format to place commas on the left.
+[2025-05-04 01:11:45] - Recent Changes: Added settings to .clang-format to ensure commas are placed on the left, including BinPackArguments: false, BinPackParameters: false, BreakBeforeInheritanceComma: true, BreakConstructorInitializersBeforeComma: true, and BreakBeforeBinaryOperators: All.
+[2025-05-04 01:11:45] - Open Questions/Issues: None. Format on save should now work correctly with commas placed on the left.
+[2025-05-04 01:12:45] - Current Focus: Updated .clang-format to disable alignment of consecutive assignments and declarations.
+[2025-05-04 01:12:45] - Recent Changes: Changed `AlignConsecutiveAssignments` and `AlignConsecutiveDeclarations` from `true` to `false` in the .clang-format file to prevent aligning every `=` on each line.
+[2025-05-04 01:12:45] - Open Questions/Issues: None. Format on save should now work correctly without aligning consecutive assignments.
+[2025-05-04 01:16:25] - Current Focus: Updated .clang-format to achieve specific function argument formatting style.
+[2025-05-04 01:16:25] - Recent Changes: Added settings to .clang-format to format function arguments with each argument on its own line and significantly indented, including `AllowAllArgumentsOnNextLine: false`, `AllowAllParametersOfDeclarationOnNextLine: false`, and `ContinuationIndentWidth: 60`.
+[2025-05-04 01:16:25] - Open Questions/Issues: None. Format on save should now format function arguments according to the user's preferred style.
+[2025-05-04 01:17:55] - Current Focus: Updated formatting settings to preserve whitespace and indentation.
+[2025-05-04 01:17:55] - Recent Changes: Added settings to preserve whitespace and indentation, including `files.insertFinalNewline: true` and `files.trimFinalNewlines: false` in VSCode settings, and `KeepEmptyLinesAtTheStartOfBlocks: true` and `MaxEmptyLinesToKeep: 2` in .clang-format.
+[2025-05-04 01:17:55] - Open Questions/Issues: None. Format on save should now preserve whitespace and indentation according to the user's preferred style.
+
+[2025-05-04 01:20:15] - Current Focus: Updated .clang-format to match the provided example code style.
+[2025-05-04 01:20:15] - Recent Changes: Changed BasedOnStyle from Google to LLVM and added spacing settings to match the example, including SpacesBeforeTrailingComments, SpacesInParentheses, SpacesInSquareBrackets, SpacesInAngles, SpaceInEmptyParentheses, SpaceBeforeParens, SpaceBeforeRangeBasedForLoopColon, SpaceBeforeInheritanceColon, and SpaceBeforeAssignmentOperators.
+[2025-05-04 01:20:15] - Open Questions/Issues: None. Format on save should now format code according to the user's preferred style as shown in the example.
