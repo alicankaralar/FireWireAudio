@@ -3,10 +3,8 @@
 
 #include <cstdint>
 
-namespace FWA
-{
-	namespace DICE
-	{
+namespace FWA {
+namespace DICE {
 
 // DICE version definition
 #define DICE_VER_1_0_7_0
@@ -22,6 +20,10 @@ namespace FWA
 //  DICE_PRIVATE_SPACE registers
 #define DICE_REGISTER_BASE 0x0000FFFFE0000000ULL // Corrected base address
 
+// Default absolute base addresses for TX and RX blocks (used as fallback)
+#define DICE_REGISTER_TX_BASE (DICE_REGISTER_BASE + 0x400ULL)
+#define DICE_REGISTER_RX_BASE (DICE_REGISTER_BASE + 0x800ULL)
+
 #define DICE_REGISTER_GLOBAL_PAR_SPACE_OFF 0x0000
 #define DICE_REGISTER_GLOBAL_PAR_SPACE_SZ 0x0004
 #define DICE_REGISTER_TX_PAR_SPACE_OFF 0x0008
@@ -34,7 +36,8 @@ namespace FWA
 #define DICE_REGISTER_UNUSED2_SPACE_SZ 0x0024
 
 //  GLOBAL_PAR_SPACE registers
-#define DICE_REGISTER_GLOBAL_OWNER 0x0000 // Shares address with DICE_REGISTER_GLOBAL_PAR_SPACE_OFF
+#define DICE_REGISTER_GLOBAL_OWNER                                             \
+  0x0000 // Shares address with DICE_REGISTER_GLOBAL_PAR_SPACE_OFF
 #define DICE_REGISTER_GLOBAL_NOTIFICATION 0x0008
 #define DICE_REGISTER_GLOBAL_NICK_NAME 0x000C
 #define DICE_REGISTER_GLOBAL_CLOCK_SELECT 0x004C
@@ -110,7 +113,8 @@ namespace FWA
 #define DICE_ROUTER_CTRL_COUNT_SHIFT 8
 
 //  Clock Controller registers (Base: 0xCE01_0000 within DICE Sub System)
-#define DICE_REGISTER_CLOCK_CONTROLLER_BASE DICE_REGISTER_DICE_SUB_SYSTEM_BASE + 0x010000ULL
+#define DICE_REGISTER_CLOCK_CONTROLLER_BASE                                    \
+  DICE_REGISTER_DICE_SUB_SYSTEM_BASE + 0x010000ULL
 
 #define DICE_REGISTER_CLOCK_CONTROLLER_SYNC_CTRL 0x0000
 #define DICE_REGISTER_CLOCK_CONTROLLER_DOMAIN_CTRL 0x0004
@@ -124,7 +128,8 @@ namespace FWA
 #define DICE_CLOCK_CONTROLLER_DOMAIN_CTRL_RTR_FS_SHIFT 4
 
 //  AES Receiver registers (Base: 0xCE02_0000 within DICE Sub System)
-#define DICE_REGISTER_AES_RECEIVER_BASE DICE_REGISTER_DICE_SUB_SYSTEM_BASE + 0x020000ULL
+#define DICE_REGISTER_AES_RECEIVER_BASE                                        \
+  DICE_REGISTER_DICE_SUB_SYSTEM_BASE + 0x020000ULL
 
 #define DICE_REGISTER_AES_RECEIVER_STAT_ALL 0x0004
 
@@ -132,7 +137,8 @@ namespace FWA
 #define DICE_AES_RECEIVER_STAT_ALL_LOCK_BIT (1UL << 0)
 
 //  Audio Mixer registers (Base: 0xCE06_0000 within DICE Sub System)
-#define DICE_REGISTER_AUDIO_MIXER_BASE DICE_REGISTER_DICE_SUB_SYSTEM_BASE + 0x060000ULL
+#define DICE_REGISTER_AUDIO_MIXER_BASE                                         \
+  DICE_REGISTER_DICE_SUB_SYSTEM_BASE + 0x060000ULL
 
 #define DICE_REGISTER_AUDIO_MIXER_NUMOFCH 0x0008
 
@@ -140,7 +146,8 @@ namespace FWA
 #define DICE_REGISTER_AVS_SUB_SYSTEM_BASE 0x0000FFFFE0000000ULL + 0xCF000000ULL
 
 // AVS Audio Receiver registers (Base: 0xCF00_0000 within AVS Sub System)
-#define DICE_REGISTER_AVS_AUDIO_RECEIVER_BASE DICE_REGISTER_AVS_SUB_SYSTEM_BASE + 0x000000ULL
+#define DICE_REGISTER_AVS_AUDIO_RECEIVER_BASE                                  \
+  DICE_REGISTER_AVS_SUB_SYSTEM_BASE + 0x000000ULL
 
 #define DICE_REGISTER_AVS_AUDIO_RECEIVER_CFG0 0x0000
 #define DICE_REGISTER_AVS_AUDIO_RECEIVER_CFG1 0x0004
@@ -154,7 +161,8 @@ namespace FWA
 #define DICE_AVS_AUDIO_RECEIVER_CFG1_SPECIFIED_DBS_SHIFT 21
 
 // AVS Audio Transmitter registers (Base: 0xCF00_00C0 within AVS Sub System)
-#define DICE_REGISTER_AVS_AUDIO_TRANSMITTER_BASE DICE_REGISTER_AVS_SUB_SYSTEM_BASE + 0x0000C0ULL
+#define DICE_REGISTER_AVS_AUDIO_TRANSMITTER_BASE                               \
+  DICE_REGISTER_AVS_SUB_SYSTEM_BASE + 0x0000C0ULL
 
 #define DICE_REGISTER_AVS_AUDIO_TRANSMITTER_CFG 0x0000
 
@@ -223,8 +231,8 @@ namespace FWA
 
 #define DICE_CLOCKSOURCE_MASK 0x0000FFFFLU
 #define DICE_GET_CLOCKSOURCE(reg) (((reg) & DICE_CLOCKSOURCE_MASK))
-#define DICE_SET_CLOCKSOURCE(reg, clk) \
-	(((reg) & ~DICE_CLOCKSOURCE_MASK) | ((clk) & DICE_CLOCKSOURCE_MASK))
+#define DICE_SET_CLOCKSOURCE(reg, clk)                                         \
+  (((reg) & ~DICE_CLOCKSOURCE_MASK) | ((clk) & DICE_CLOCKSOURCE_MASK))
 
 // Supported rates
 #define DICE_RATE_32K 0x00
@@ -241,7 +249,8 @@ namespace FWA
 
 #define DICE_RATE_MASK 0x0000FF00LU
 #define DICE_GET_RATE(reg) (((reg) & DICE_RATE_MASK) >> 8)
-#define DICE_SET_RATE(reg, rate) (((reg) & ~DICE_RATE_MASK) | (((rate) << 8) & DICE_RATE_MASK))
+#define DICE_SET_RATE(reg, rate)                                               \
+  (((reg) & ~DICE_RATE_MASK) | (((rate) << 8) & DICE_RATE_MASK))
 
 //   ENABLE register
 #define DICE_ISOSTREAMING_ENABLE (1UL << 0)
@@ -282,13 +291,17 @@ namespace FWA
 //   VERSION register
 #define DICE_DRIVER_SPEC_VERSION_NUMBER_GET(x, y) (((x) >> (y)) & 0xFF)
 
-#define DICE_DRIVER_SPEC_VERSION_NUMBER_GET_A(x) DICE_DRIVER_SPEC_VERSION_NUMBER_GET(x, 24)
+#define DICE_DRIVER_SPEC_VERSION_NUMBER_GET_A(x)                               \
+  DICE_DRIVER_SPEC_VERSION_NUMBER_GET(x, 24)
 
-#define DICE_DRIVER_SPEC_VERSION_NUMBER_GET_B(x) DICE_DRIVER_SPEC_VERSION_NUMBER_GET(x, 16)
+#define DICE_DRIVER_SPEC_VERSION_NUMBER_GET_B(x)                               \
+  DICE_DRIVER_SPEC_VERSION_NUMBER_GET(x, 16)
 
-#define DICE_DRIVER_SPEC_VERSION_NUMBER_GET_C(x) DICE_DRIVER_SPEC_VERSION_NUMBER_GET(x, 8)
+#define DICE_DRIVER_SPEC_VERSION_NUMBER_GET_C(x)                               \
+  DICE_DRIVER_SPEC_VERSION_NUMBER_GET(x, 8)
 
-#define DICE_DRIVER_SPEC_VERSION_NUMBER_GET_D(x) DICE_DRIVER_SPEC_VERSION_NUMBER_GET(x, 0)
+#define DICE_DRIVER_SPEC_VERSION_NUMBER_GET_D(x)                               \
+  DICE_DRIVER_SPEC_VERSION_NUMBER_GET(x, 0)
 
 //   CLOCKCAPABILITIES register
 #define DICE_CLOCKCAP_RATE_32K (1UL << 0)
@@ -406,60 +419,90 @@ namespace FWA
 #define DICE_EAP_CURRCFG_HIGH_STREAM 0x5000
 
 #define DICE_EAP_CHANNEL_CONFIG_NAMESTR_LEN_QUADS (64)
-#define DICE_EAP_CHANNEL_CONFIG_NAMESTR_LEN_BYTES (4 * DICE_EAP_CHANNEL_CONFIG_NAMESTR_LEN_QUADS)
+#define DICE_EAP_CHANNEL_CONFIG_NAMESTR_LEN_BYTES                              \
+  (4 * DICE_EAP_CHANNEL_CONFIG_NAMESTR_LEN_QUADS)
 
 // DICE Notifier
 #define DICE_NOTIFIER_BASE_ADDRESS 0xFFFFE00000000000ULL
 #define DICE_NOTIFIER_BLOCK_LENGTH 4
 
-		// Clock sources for SYNC_CTRL
-		enum class ClockSource
-		{
-			AES0 = 0,
-			AES1 = 1,
-			AES2 = 2,
-			AES3 = 3,
-			SlaveInputs = 4,
-			HPLL = 5,
-			Internal = 6,
-			Unknown = 0xFF
-		};
+// Clock sources for SYNC_CTRL
+enum class ClockSource {
+  AES0 = 0,
+  AES1 = 1,
+  AES2 = 2,
+  AES3 = 3,
+  SlaveInputs = 4,
+  HPLL = 5,
+  Internal = 6,
+  Unknown = 0xFF
+};
 
-		// AVS System Modes for ATXn_CFG
-		enum class AvsSystemMode
-		{
-			Low = 0,	// 32k-48k
-			Mid = 1,	// 88.2k-96k
-			High = 2, // 176.4k-192k
-			Unknown = 0xFF
-		};
+// AVS System Modes for ATXn_CFG
+enum class AvsSystemMode {
+  Low = 0,  // 32k-48k
+  Mid = 1,  // 88.2k-96k
+  High = 2, // 176.4k-192k
+  Unknown = 0xFF
+};
 
-		// Router Frame Sync modes for DOMAIN_CTRL
-		enum class RouterFrameSyncMode
-		{
-			BaseRate = 0,
-			DoubleRate = 1,
-			QuadRate = 2,
-			Unknown = 0xFF
-		};
+// Router Frame Sync modes for DOMAIN_CTRL
+enum class RouterFrameSyncMode {
+  BaseRate = 0,
+  DoubleRate = 1,
+  QuadRate = 2,
+  Unknown = 0xFF
+};
 
-		// DICE chip types
-		enum class DiceChipType
-		{
-			DiceII = 0,
-			DiceMini = 1,
-			DiceJr = 2,
-			Unknown = 0xFF
-		};
+// DICE chip types
+enum class DiceChipType {
+  DiceII = 0,
+  DiceMini = 1,
+  DiceJr = 2,
+  Unknown = 0xFF
+};
 
-		// DICE configuration types
-		enum class DiceConfig
-		{
-			Unknown,
-			Low, // 32k-48k
-			Mid, // 88.2k-96k
-			High // 176.4k-192k
-		};
+// DICE configuration types
+enum class DiceConfig {
+  Unknown,
+  Low, // 32k-48k
+  Mid, // 88.2k-96k
+  High // 176.4k-192k
+};
 
-	} // namespace DICE
+// Route Sources (Inputs to the router matrix)
+enum class RouteSource : uint8_t {
+  AES = 0,
+  ADAT = 1,
+  // 2, 3 reserved?
+  Mixer = 4,
+  // 5 reserved?
+  InS0 = 6,  // Input Stream 0 (from device physical inputs)
+  InS1 = 7,  // Input Stream 1 (from device physical inputs - DiceJr?)
+  ARM = 8,   // ARM processor audio
+  ARX0 = 9,  // Audio Receiver 0 (FireWire input)
+  ARX1 = 10, // Audio Receiver 1 (FireWire input)
+  // 11-14 reserved?
+  Muted = 15,
+  Invalid = 0xFF
+};
+
+// Route Destinations (Outputs from the router matrix)
+enum class RouteDestination : uint8_t {
+  AES = 0,
+  ADAT = 1,
+  // 2 reserved?
+  Mixer0 = 3, // Mixer Input Bank 0
+  Mixer1 = 4, // Mixer Input Bank 1
+  InS0 = 5,   // Input Stream 0 (to device physical outputs)
+  InS1 = 6,   // Input Stream 1 (to device physical outputs - DiceJr?)
+  ARM = 7,    // ARM processor audio
+  ATX0 = 8,   // Audio Transmitter 0 (FireWire output)
+  ATX1 = 9,   // Audio Transmitter 1 (FireWire output)
+  // 10-14 reserved?
+  Muted = 15,
+  Invalid = 0xFF
+};
+
+} // namespace DICE
 } // namespace FWA

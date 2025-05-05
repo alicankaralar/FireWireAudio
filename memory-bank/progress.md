@@ -21,6 +21,9 @@ YYYY-MM-DD HH:MM:SS - Log of updates made.
 
 *   Test DICE device detection after code changes.
 *   Address potential issues with AVC command interface creation/usage if needed.
+*   [2025-05-06 00:23:00] - Analyzed `ref/libffado-2.4.9` source code (DICE implementation) and synthesized insights.
+*   [2025-05-06 00:01:00] - Synthesized key information from DICE reference documentation (`ref/dice.c`, `ref/dice docs/*.pdf`).
+
 [2025-05-03 08:08:53] - Completed debugging firewire_scanner for DICE base address discovery. Identified 0xFFFFF0000000 via Config ROM key 0xD1. Blocked by kIOReturnNotResponding (-536838121) on reads in this range. Next: External research on error.
 [2025-05-03 08:15:21] - New Task: Refactor src/tools/firewire_scanner.cpp into smaller files (<250 lines) within a new src/tools/scanner/ directory. Remove redundant code (bruteforce scan, getDeviceGuid). Update CMakeLists.txt.
 [2025-05-03 08:43:06] - Completed refactoring of firewire_scanner into src/tools/scanner/. Build successful. Removed old src/tools/firewire_scanner.cpp.
@@ -45,3 +48,8 @@ YYYY-MM-DD HH:MM:SS - Log of updates made.
 [2025-05-04 01:18:00] - Updated formatting settings to preserve whitespace and indentation. Added `files.insertFinalNewline: true` and `files.trimFinalNewlines: false` to VSCode settings, and `KeepEmptyLinesAtTheStartOfBlocks: true` and `MaxEmptyLinesToKeep: 2` to .clang-format to ensure spaces are not trimmed on newlines and to include the same amount of space as the indent level.
 
 [2025-05-04 01:20:25] - Updated .clang-format to match the provided example code style. Changed BasedOnStyle from Google to LLVM and added spacing settings to match the example, including SpacesBeforeTrailingComments, SpacesInParentheses, SpacesInSquareBrackets, SpacesInAngles, SpaceInEmptyParentheses, SpaceBeforeParens, SpaceBeforeRangeBasedForLoopColon, SpaceBeforeInheritanceColon, and SpaceBeforeAssignmentOperators.
+
+[2025-05-05 02:09:42] - Verified that `src/tools/scanner/io_helpers.cpp::readQuadlet` already implements Strategy A (using `ReadBlock` for high addresses >= 0xFFFFF0000000). No code changes required for this task.
+*   [2025-05-06 00:23:00] - Update Memory Bank files (`productContext.md`, `systemPatterns.md`, `activeContext.md`, `progress.md`) with synthesized information from DICE docs, `ref/dice.c`, `ref/libhitaki`, and `ref/libffado`.
+
+[2025-05-05 22:42:20] - Completed refactoring of DICE base address discovery logic in `src/tools/scanner/dice_helpers.cpp`. Extracted logic into helper functions, replaced `std::cerr` with logging, added robustness checks, and cleaned up `readDiceRegisters`.

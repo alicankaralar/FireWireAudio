@@ -373,6 +373,36 @@ endif()
 enable_testing()
 add_subdirectory(test)
 
+# --- FireWire Scanner Tool ---
+set(SCANNER_SOURCES
+    src/tools/scanner/config_rom.cpp
+    src/tools/scanner/dice_helpers.cpp
+    src/tools/scanner/dice_stream_registers.cpp
+    src/tools/scanner/eap_helpers.cpp
+    src/tools/scanner/io_helpers.cpp
+    src/tools/scanner/main.cpp
+    src/tools/scanner/scanner.cpp
+    src/tools/scanner/utils_explore_channels.cpp
+    src/tools/scanner/utils_explore_general.cpp
+    src/tools/scanner/utils_explore.cpp
+    src/tools/scanner/utils_memory.cpp
+    src/tools/scanner/utils_print.cpp
+    src/tools/scanner/utils_signal.cpp
+    src/tools/scanner/utils_string.cpp
+)
+add_executable(firewire_scanner ${SCANNER_SOURCES})
+target_include_directories(firewire_scanner PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include # Project-wide includes
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tools/scanner # Scanner-specific headers
+)
+target_link_libraries(firewire_scanner PRIVATE
+    spdlog::spdlog
+    "-framework IOKit"
+    "-framework CoreFoundation"
+    "-framework Foundation"
+    # Add Shared if scanner uses shared code, e.g. target_link_libraries(firewire_scanner PRIVATE Shared)
+)
+
 # --- Source Groups (for IDE organization) ---
 
 # Group source files

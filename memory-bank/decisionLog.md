@@ -67,3 +67,9 @@ Implementation Details: Modify IOKitFireWireDeviceDiscovery::deviceAdded, AudioD
 [2025-05-04 01:20:05] - Rationale: User provided a complete example of their preferred formatting style, which required additional adjustments to the .clang-format file.
 [2025-05-04 01:20:05] - Implementation Details: 1) Changed BasedOnStyle from Google to LLVM; 2) Added spacing settings to match the example, including SpacesBeforeTrailingComments, SpacesInParentheses, SpacesInSquareBrackets, SpacesInAngles, SpaceInEmptyParentheses, SpaceBeforeParens, SpaceBeforeRangeBasedForLoopColon, SpaceBeforeInheritanceColon, and SpaceBeforeAssignmentOperators.
 [2025-05-04 01:20:05] - Implications: Code formatting will now more closely match the example provided by the user, ensuring consistent formatting across all files.
+
+---
+[2025-05-05 02:00:40] - Decision: Modified `readQuadlet` function in `src/tools/scanner/io_helpers.cpp` to use `IOFireWireLib::ReadBlock` for high FireWire addresses (&gt;= 0xFFFFF0000000).
+Rationale: This implements Strategy A from the architect's plan to address `kIOReturnNotResponding` errors encountered when using `ReadQuadlet` for high addresses, specifically targeting the DICE register space. `ReadBlock` might be more suitable for accessing these memory regions.
+Implementation Details: Added a conditional check for the address. If &gt;= threshold, call `ReadBlock` requesting 4 bytes. Otherwise, call the original `ReadQuadlet`. Error handling is maintained for both paths.
+Implications: This change might resolve the read errors for high addresses, enabling successful interaction with DICE registers. Testing is required to confirm.

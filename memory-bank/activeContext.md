@@ -11,12 +11,16 @@ YYYY-MM-DD HH:MM:SS - Log of updates made.
 *   Understanding project structure and goals.
 *   Addressing DICE chipset implementation issues (as per initial user request).
 
-## Recent Changes
+*   Updating Memory Bank files with synthesized information from DICE docs, `ref/dice.c`, `ref/libhitaki`, and `ref/libffado`.
 
+## Recent Changes
 *   Created `memory-bank/productContext.md`.
 
-## Open Questions/Issues
+*   [2025-05-06 00:01:00] - Synthesized information from DICE reference documents (`ref/dice.c`, `ref/dice docs/*.pdf`).
 
+*   [2025-05-06 00:21:00] - Analyzed `ref/libffado-2.4.9` source code (DICE implementation) and updated Memory Bank (`productContext.md`, `systemPatterns.md`) with insights on architecture, register access (including offset discrepancies), notifications, streaming, ownership, and EAP support.
+
+## Open Questions/Issues
 *   Specific nature of DICE chipset problems.
 *   Current state of the `firewire_scanner` tool and its output.
 ---
@@ -101,3 +105,9 @@ YYYY-MM-DD HH:MM:SS - Log of updates made.
 [2025-05-04 01:20:15] - Current Focus: Updated .clang-format to match the provided example code style.
 [2025-05-04 01:20:15] - Recent Changes: Changed BasedOnStyle from Google to LLVM and added spacing settings to match the example, including SpacesBeforeTrailingComments, SpacesInParentheses, SpacesInSquareBrackets, SpacesInAngles, SpaceInEmptyParentheses, SpaceBeforeParens, SpaceBeforeRangeBasedForLoopColon, SpaceBeforeInheritanceColon, and SpaceBeforeAssignmentOperators.
 [2025-05-04 01:20:15] - Open Questions/Issues: None. Format on save should now format code according to the user's preferred style as shown in the example.
+*   Which specific DICE registers are crucial for resolving the `kIOReturnNotResponding` error during reads? (e.g., registers related to device state, clock lock, or specific interface enable flags).
+
+[2025-05-05 22:42:32] - **Recent Changes:** Refactored `dice_helpers.cpp` to improve DICE base address discovery logic. Extracted code into `discoverDiceBaseAddressesInternal` and `readDiceOffsetsInternal`. Replaced `std::cerr` with logging functions. Added checks for valid base addresses before proceeding with register reads.
+[2025-05-05 22:42:32] - **Current Focus:** Ready to compile the changes made to `dice_helpers.cpp` to check for errors.
+
+*   [2025-05-05 23:48:12] - Analyzed `ref/dice.c` (Linux kernel driver) and updated Memory Bank (`productContext.md`) with relevant hardware IDs and device-specific handling insights.
