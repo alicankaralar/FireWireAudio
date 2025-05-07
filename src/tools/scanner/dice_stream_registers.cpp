@@ -1,433 +1,347 @@
 #include "dice_stream_registers.hpp"
-#include "io_helpers.hpp"		// For safeReadQuadlet, interpretAsASCII
-#include "scanner.hpp"			// For FireWireDevice, DiceDefines.hpp constants
-#include "dice_helpers.hpp" // For DICE_REGISTER constants
+#include "dice_helpers.hpp"       // For DICE_REGISTER constants
+#include "endianness_helpers.hpp" // For detectDeviceEndianness, deviceToHostInt32
+#include "io_helpers.hpp"         // For safeReadQuadlet, interpretAsASCII
+#include "scanner.hpp" // For FireWireDevice, DiceDefines.hpp constants
 
-#include <iostream>
 #include <iomanip> // For std::hex, std::setw, std::setfill
+#include <iostream>
 #include <map>
 #include <string>
 
-#include <CoreFoundation/CoreFoundation.h> // For CFSwapInt32LittleToHost
 #include <IOKit/firewire/IOFireWireLib.h>
 
-namespace FWA::SCANNER
-{
+namespace FWA::SCANNER {
 
-	// Helper to read TX stream parameters using progressive discovery
-	void readDiceTxStreamRegisters(IOFireWireDeviceInterface **deviceInterface, io_service_t service,
-																 FireWireDevice &device, uint64_t discoveredDiceBase, UInt32 generation,
-																 uint32_t txStreamSizeQuadlets)
-	{
-		// Skip if invalid size
-		if (txStreamSizeQuadlets == 0)
-		{
-			std::cerr << "Debug [DICE]: Skipping TX stream register read (invalid size=" << txStreamSizeQuadlets << ")." << std::endl;
-			return;
-		}
+// Helper to read TX stream parameters using the stream count from device
+void readDiceTxStreamRegisters(IOFireWireDeviceInterface **deviceInterface,
+                               io_service_t service, FireWireDevice &device,
+                               uint64_t discoveredDiceBase, UInt32 generation,
+                               uint32_t txStreamSizeQuadlets) {
+  // Skip if invalid size or stream count
+  if (txStreamSizeQuadlets == 0) {
+    std::cerr << "Debug [DICE]: Skipping TX stream register read (invalid size="
+              << txStreamSizeQuadlets << ")." << std::endl;
+    return;
+  }
 
-		// Store the original reported count for reference
-		uint32_t reportedStreamCount = device.txStreamCount;
+  if (device.txStreamCount == 0) {
+    std::cerr
+        << "Debug [DICE]: Skipping TX stream register read (stream count=0)."
+        << std::endl;
+    return;
+  }
 
-		// Set a reasonable upper bound for exploration
-		// This is not a hardcoded limit, just a safety cap for exploration
-		const uint32_t MAX_REASONABLE_STREAMS = 16;
-		uint32_t maxStreamsToExplore = (reportedStreamCount == 0) ? MAX_REASONABLE_STREAMS : std::min(reportedStreamCount, MAX_REASONABLE_STREAMS);
+  std::cerr << "Info [DICE]: Reading TX streams based on reported count: "
+            << device.txStreamCount << std::endl;
 
-		if (reportedStreamCount > MAX_REASONABLE_STREAMS)
-		{
-			std::cerr << "Warning [DICE]: Reported TX stream count (" << reportedStreamCount
-								<< ") exceeds reasonable limit. Will explore up to "
-								<< MAX_REASONABLE_STREAMS << " streams." << std::endl;
-		}
-		else if (reportedStreamCount == 0)
-		{
-			std::cerr << "Warning [DICE]: No TX streams reported. Will explore up to "
-								<< MAX_REASONABLE_STREAMS << " streams to discover actual count." << std::endl;
-		}
+  // Find TX Parameter Space Offset (needs to be read first)
+  uint64_t txParamSpaceOffsetAddr =
+      discoveredDiceBase + DICE_REGISTER_TX_PAR_SPACE_OFF;
+  uint32_t txParamSpaceOffsetQuadlets = 0;
+  if (device.diceRegisters.count(txParamSpaceOffsetAddr)) {
+    txParamSpaceOffsetQuadlets = deviceToHostInt32(
+        device.diceRegisters[txParamSpaceOffsetAddr], device.deviceEndianness);
+  } else {
+    std::cerr << "Warning [DICE]: TX Parameter Space Offset not previously "
+                 "read. Cannot read TX stream details."
+              << std::endl;
+    return;
+  }
+  uint64_t txParamSpaceBase =
+      discoveredDiceBase + (txParamSpaceOffsetQuadlets * 4);
+  std::cerr << "Debug [DICE]: TX Parameter Space Base Address: 0x" << std::hex
+            << txParamSpaceBase << std::dec << std::endl;
 
-		std::cerr << "Info [DICE]: Starting progressive discovery of TX streams..." << std::endl;
+  // Define all registers to read for streams
+  std::map<uint64_t, std::string> allTxStreamRegs = {
+      {DICE_REGISTER_TX_ISOC_BASE - DICE_REGISTER_TX_BASE, "ISOC"},
+      {DICE_REGISTER_TX_NB_AUDIO_BASE - DICE_REGISTER_TX_BASE,
+       "Audio Channels"},
+      {DICE_REGISTER_TX_MIDI_BASE - DICE_REGISTER_TX_BASE, "MIDI"},
+      {DICE_REGISTER_TX_SPEED_BASE - DICE_REGISTER_TX_BASE, "Speed"},
+      {DICE_REGISTER_TX_NAMES_BASE - DICE_REGISTER_TX_BASE, "Names Base"},
+      {DICE_REGISTER_TX_AC3_CAPABILITIES_BASE - DICE_REGISTER_TX_BASE,
+       "AC3 Capabilities"},
+      {DICE_REGISTER_TX_AC3_ENABLE_BASE - DICE_REGISTER_TX_BASE, "AC3 Enable"}};
 
-		// Find TX Parameter Space Offset (needs to be read first)
-		uint64_t txParamSpaceOffsetAddr = discoveredDiceBase + DICE_REGISTER_TX_PAR_SPACE_OFF;
-		uint32_t txParamSpaceOffsetQuadlets = 0;
-		if (device.diceRegisters.count(txParamSpaceOffsetAddr))
-		{
-			txParamSpaceOffsetQuadlets = CFSwapInt32LittleToHost(device.diceRegisters[txParamSpaceOffsetAddr]);
-		}
-		else
-		{
-			std::cerr << "Warning [DICE]: TX Parameter Space Offset not previously read. Cannot read TX stream details." << std::endl;
-			return;
-		}
-		uint64_t txParamSpaceBase = discoveredDiceBase + (txParamSpaceOffsetQuadlets * 4);
-		std::cerr << "Debug [DICE]: TX Parameter Space Base Address: 0x" << std::hex << txParamSpaceBase << std::dec << std::endl;
+  // Read registers for each stream based on the reported count
+  for (uint32_t i = 0; i < device.txStreamCount; ++i) {
+    uint64_t streamInstanceOffsetBytes = i * txStreamSizeQuadlets * 4;
 
-		// Define key registers to check for each stream
-		// We'll use a smaller set of critical registers as "probe" registers
-		std::vector<std::pair<uint64_t, std::string>> probeRegisters = {
-				{DICE_REGISTER_TX_ISOC_BASE, "ISOC"},
-				{DICE_REGISTER_TX_NB_AUDIO_BASE, "Audio Channels"}};
+    // Reduced logging - only log at higher level
+    if (logger_)
+      logger_->debug("Reading TX stream [{}]...", i);
 
-		// Define all registers to read for valid streams
-		std::map<uint64_t, std::string> allTxStreamRegs = {
-				{DICE_REGISTER_TX_ISOC_BASE, "ISOC"},
-				{DICE_REGISTER_TX_NB_AUDIO_BASE, "Audio Channels"},
-				{DICE_REGISTER_TX_MIDI_BASE, "MIDI"},
-				{DICE_REGISTER_TX_SPEED_BASE, "Speed"},
-				{DICE_REGISTER_TX_NAMES_BASE, "Names Base"},
-				{DICE_REGISTER_TX_AC3_CAPABILITIES_BASE, "AC3 Capabilities"},
-				{DICE_REGISTER_TX_AC3_ENABLE_BASE, "AC3 Enable"}};
+    // Read all registers for this stream
+    for (const auto &regPair : allTxStreamRegs) {
+      uint64_t regRelativeOffset = regPair.first;
+      const std::string &regName = regPair.second;
+      uint64_t fullAddr =
+          txParamSpaceBase + streamInstanceOffsetBytes + regRelativeOffset;
+      UInt32 value = 0;
 
-		// Track valid streams and failures
-		uint32_t validStreamCount = 0;
-		uint32_t consecutiveFailures = 0;
-		const uint32_t MAX_CONSECUTIVE_FAILURES = 3;
+      IOReturn status = FWA::SCANNER::safeReadQuadlet(
+          deviceInterface, service, fullAddr, value, generation);
+      if (status == kIOReturnSuccess) {
+        // Successfully read this register
+        device.diceRegisters[fullAddr] = value; // Store raw BE value
+        UInt32 swappedValue = deviceToHostInt32(value, device.deviceEndianness);
+        std::string ascii = FWA::SCANNER::interpretAsASCII(swappedValue);
 
-		// Progressive discovery loop
-		for (uint32_t i = 0; i < maxStreamsToExplore; ++i)
-		{
-			uint64_t streamInstanceOffsetBytes = i * txStreamSizeQuadlets * 4;
-			bool streamValid = false;
+        // Reduce log verbosity - only log non-empty ASCII values or at debug
+        // level
+        if (!ascii.empty()) {
+          std::cerr << "Info [DICE]: TX[" << i << "] " << regName << ": '"
+                    << ascii << "'" << std::endl;
+        }
 
-			// Reduced logging - only log at higher level
-			if (logger_)
-				logger_->debug("Probing TX stream [{}]...", i);
+        // Detailed register info only at debug level
+        if (logger_)
+          logger_->debug("TX[{}] {} (0x{:x}): 0x{:x}", i, regName, fullAddr,
+                         swappedValue);
 
-			// Try to read the probe registers for this stream
-			for (const auto &regPair : probeRegisters)
-			{
-				uint64_t regRelativeOffset = regPair.first;
-				const std::string &regName = regPair.second;
-				uint64_t fullAddr = txParamSpaceBase + streamInstanceOffsetBytes + regRelativeOffset;
-				UInt32 value = 0;
+        // Validate register content based on register type
+        if (regName == "ISOC") {
+          // ISOC register: Check if value is between 0-63 (inclusive)
+          if (swappedValue > 63 &&
+              swappedValue !=
+                  0xFFFFFFFF) // 0xFFFFFFFF might be used as "unassigned"
+          {
+            std::cerr << "Warning [DICE]: TX[" << i << "] ISOC value ("
+                      << swappedValue << ") is outside valid range (0-63)"
+                      << std::endl;
+          }
+        } else if (regName == "Audio Channels") {
+          // NB_AUDIO register: Check if value is non-zero and within reasonable
+          // limit
+          if (swappedValue == 0) {
+            std::cerr << "Warning [DICE]: TX[" << i
+                      << "] Audio Channels value is zero" << std::endl;
+          } else if (swappedValue > 32) // Reasonable upper limit
+          {
+            std::cerr << "Warning [DICE]: TX[" << i
+                      << "] Audio Channels value (" << swappedValue
+                      << ") exceeds reasonable limit (32)" << std::endl;
+          }
+        } else if (regName == "MIDI") {
+          // MIDI register: Check if value is within reasonable limit
+          if (swappedValue > 16) // Reasonable upper limit for MIDI channels
+          {
+            std::cerr << "Warning [DICE]: TX[" << i << "] MIDI value ("
+                      << swappedValue << ") exceeds reasonable limit (16)"
+                      << std::endl;
+          }
+        } else if (regName == "Speed") {
+          // SPEED register: Check if value matches known FireWire speed
+          // constants
+          if (swappedValue != 0 && swappedValue != 1 &&
+              swappedValue != 2) // S100, S200, S400
+          {
+            std::cerr
+                << "Warning [DICE]: TX[" << i << "] Speed value ("
+                << swappedValue
+                << ") is not a valid FireWire speed (0=S100, 1=S200, 2=S400)"
+                << std::endl;
+          }
+        } else if (regName == "Names Base") {
+          // NAMES_BASE register: Check if value is plausible within DICE
+          // address space
+          if (swappedValue == 0 ||
+              swappedValue > 0x1000000) // Arbitrary large value
+          {
+            std::cerr << "Warning [DICE]: TX[" << i << "] Names Base value (0x"
+                      << std::hex << swappedValue << std::dec
+                      << ") seems implausible" << std::endl;
+          } else {
+            // Convert quadlet offset to absolute address
+            uint64_t channelNamesAddr =
+                discoveredDiceBase + (static_cast<uint64_t>(swappedValue) * 4);
+            std::cerr << "Info [DICE]: TX[" << i << "] Names Base points to 0x"
+                      << std::hex << channelNamesAddr << std::dec << std::endl;
 
-				IOReturn status = FWA::SCANNER::safeReadQuadlet(deviceInterface, service, fullAddr, value, generation);
-				if (status == kIOReturnSuccess)
-				{
-					// Successfully read this register
-					device.diceRegisters[fullAddr] = value; // Store raw BE value
-					UInt32 swappedValue = CFSwapInt32LittleToHost(value);
-					std::string ascii = FWA::SCANNER::interpretAsASCII(swappedValue);
+            // Store this as a potential channel names address if we don't have
+            // one yet
+            if (device.channelNamesBaseAddr == DICE_INVALID_OFFSET) {
+              device.channelNamesBaseAddr = channelNamesAddr;
+              std::cerr
+                  << "Info [DICE]: Setting device.channelNamesBaseAddr to 0x"
+                  << std::hex << channelNamesAddr << std::dec << " from TX["
+                  << i << "] Names Base" << std::endl;
+            }
+          }
+        } else if (regName.find("AC3") != std::string::npos) {
+          // AC3_* registers: No specific validation yet, but could be added if
+          // patterns are known
+        }
+      } else {
+        std::cerr << "Warning [DICE]: Read failed for TX[" << i << "] "
+                  << regName << " (0x" << std::hex << fullAddr
+                  << ") (status: " << status << ")" << std::dec << std::endl;
+      }
+    }
+  }
+}
 
-					// Reduce log verbosity - only log non-empty ASCII values or at debug level
-					if (!ascii.empty())
-					{
-						std::cerr << "Info [DICE]: TX[" << i << "] " << regName << ": '" << ascii << "'" << std::endl;
-					}
-					// Detailed register info only at debug level
-					if (logger_)
-						logger_->debug("TX[{}] {} (0x{:x}): 0x{:x}", i, regName, fullAddr, swappedValue);
+// Helper to read RX stream parameters using the stream count from device
+void readDiceRxStreamRegisters(IOFireWireDeviceInterface **deviceInterface,
+                               io_service_t service, FireWireDevice &device,
+                               uint64_t discoveredDiceBase, UInt32 generation,
+                               uint32_t rxStreamSizeQuadlets) {
+  // Skip if invalid size or stream count
+  if (rxStreamSizeQuadlets == 0) {
+    std::cerr << "Debug [DICE]: Skipping RX stream register read (invalid size="
+              << rxStreamSizeQuadlets << ")." << std::endl;
+    return;
+  }
 
-					streamValid = true; // Mark this stream as valid if at least one register reads successfully
-				}
-				else
-				{
-					std::cerr << "Warning [DICE]: Read failed for TX[" << i << "] " << regName
-										<< " (0x" << std::hex << fullAddr << ") (status: " << status << ")" << std::dec << std::endl;
+  if (device.rxStreamCount == 0) {
+    std::cerr
+        << "Debug [DICE]: Skipping RX stream register read (stream count=0)."
+        << std::endl;
+    return;
+  }
 
-					// Don't increment consecutive failures here, only if the entire stream fails
-				}
-			}
+  std::cerr << "Info [DICE]: Reading RX streams based on reported count: "
+            << device.rxStreamCount << std::endl;
 
-			if (streamValid)
-			{
-				// This stream is valid, increment counter
-				validStreamCount++;
-				consecutiveFailures = 0; // Reset failure counter on success
+  // Find RX Parameter Space Offset (needs to be read first)
+  uint64_t rxParamSpaceOffsetAddr =
+      discoveredDiceBase + DICE_REGISTER_RX_PAR_SPACE_OFF;
+  uint32_t rxParamSpaceOffsetQuadlets = 0;
+  if (device.diceRegisters.count(rxParamSpaceOffsetAddr)) {
+    rxParamSpaceOffsetQuadlets = deviceToHostInt32(
+        device.diceRegisters[rxParamSpaceOffsetAddr], device.deviceEndianness);
+  } else {
+    std::cerr << "Warning [DICE]: RX Parameter Space Offset not previously "
+                 "read. Cannot read RX stream details."
+              << std::endl;
+    return;
+  }
+  uint64_t rxParamSpaceBase =
+      discoveredDiceBase + (rxParamSpaceOffsetQuadlets * 4);
+  std::cerr << "Debug [DICE]: RX Parameter Space Base Address: 0x" << std::hex
+            << rxParamSpaceBase << std::dec << std::endl;
 
-				// Now read the rest of the registers for this stream
-				for (const auto &regPair : allTxStreamRegs)
-				{
-					// Skip registers we already read during probing
-					bool alreadyRead = false;
-					for (const auto &probeReg : probeRegisters)
-					{
-						if (probeReg.first == regPair.first)
-						{
-							alreadyRead = true;
-							break;
-						}
-					}
-					if (alreadyRead)
-						continue;
+  // Define all registers to read for streams
+  std::map<uint64_t, std::string> allRxStreamRegs = {
+      {DICE_REGISTER_RX_ISOC_BASE - DICE_REGISTER_RX_BASE, "ISOC"},
+      {DICE_REGISTER_RX_SEQ_START_BASE - DICE_REGISTER_RX_BASE,
+       "Sequence Start"},
+      {DICE_REGISTER_RX_NB_AUDIO_BASE - DICE_REGISTER_RX_BASE,
+       "Audio Channels"},
+      {DICE_REGISTER_RX_MIDI_BASE - DICE_REGISTER_RX_BASE, "MIDI"},
+      {DICE_REGISTER_RX_NAMES_BASE - DICE_REGISTER_RX_BASE, "Names Base"},
+      {DICE_REGISTER_RX_AC3_CAPABILITIES_BASE - DICE_REGISTER_RX_BASE,
+       "AC3 Capabilities"},
+      {DICE_REGISTER_RX_AC3_ENABLE_BASE - DICE_REGISTER_RX_BASE, "AC3 Enable"}};
 
-					uint64_t regRelativeOffset = regPair.first;
-					const std::string &regName = regPair.second;
-					uint64_t fullAddr = txParamSpaceBase + streamInstanceOffsetBytes + regRelativeOffset;
-					UInt32 value = 0;
+  // Read registers for each stream based on the reported count
+  for (uint32_t i = 0; i < device.rxStreamCount; ++i) {
+    uint64_t streamInstanceOffsetBytes = i * rxStreamSizeQuadlets * 4;
 
-					IOReturn status = FWA::SCANNER::safeReadQuadlet(deviceInterface, service, fullAddr, value, generation);
-					if (status == kIOReturnSuccess)
-					{
-						device.diceRegisters[fullAddr] = value; // Store raw BE value
-						UInt32 swappedValue = CFSwapInt32LittleToHost(value);
-						std::string ascii = FWA::SCANNER::interpretAsASCII(swappedValue);
+    // Reduced logging - only log at higher level
+    if (logger_)
+      logger_->debug("Reading RX stream [{}]...", i);
 
-						// Reduce log verbosity - only log non-empty ASCII values or at debug level
-						if (!ascii.empty())
-						{
-							std::cerr << "Info [DICE]: TX[" << i << "] " << regName << ": '" << ascii << "'" << std::endl;
-						}
-						// Detailed register info only at debug level
-						if (logger_)
-							logger_->debug("TX[{}] {} (0x{:x}): 0x{:x}", i, regName, fullAddr, swappedValue);
-					}
-					else
-					{
-						std::cerr << "Warning [DICE]: Read failed for TX[" << i << "] " << regName
-											<< " (0x" << std::hex << fullAddr << ") (status: " << status << ")" << std::dec << std::endl;
-						// Non-critical register, continue anyway
-					}
-				}
-			}
-			else
-			{
-				// This entire stream failed, increment consecutive failures
-				consecutiveFailures++;
+    // Read all registers for this stream
+    for (const auto &regPair : allRxStreamRegs) {
+      uint64_t regRelativeOffset = regPair.first;
+      const std::string &regName = regPair.second;
+      uint64_t fullAddr =
+          rxParamSpaceBase + streamInstanceOffsetBytes + regRelativeOffset;
+      UInt32 value = 0;
 
-				if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES)
-				{
-					std::cerr << "Info [DICE]: Stopping TX stream discovery after " << consecutiveFailures
-										<< " consecutive stream failures." << std::endl;
-					break;
-				}
-			}
-		}
+      IOReturn status = FWA::SCANNER::safeReadQuadlet(
+          deviceInterface, service, fullAddr, value, generation);
+      if (status == kIOReturnSuccess) {
+        // Successfully read this register
+        device.diceRegisters[fullAddr] = value; // Store raw BE value
+        UInt32 swappedValue = deviceToHostInt32(value, device.deviceEndianness);
+        std::string ascii = FWA::SCANNER::interpretAsASCII(swappedValue);
 
-		// Update the device's stream count based on our discovery
-		if (validStreamCount > 0)
-		{
-			if (validStreamCount != reportedStreamCount)
-			{
-				std::cerr << "Info [DICE]: Adjusting TX stream count from reported " << reportedStreamCount
-									<< " to discovered " << validStreamCount << " based on successful reads." << std::endl;
-				device.txStreamCount = validStreamCount;
-			}
-			else
-			{
-				std::cerr << "Info [DICE]: Confirmed TX stream count of " << validStreamCount
-									<< " matches reported count." << std::endl;
-			}
-		}
-		else if (reportedStreamCount > 0)
-		{
-			std::cerr << "Warning [DICE]: No valid TX streams discovered. Keeping reported count of "
-								<< reportedStreamCount << " for reference." << std::endl;
-		}
-		else
-		{
-			std::cerr << "Warning [DICE]: No valid TX streams discovered and none reported." << std::endl;
-			device.txStreamCount = 0;
-		}
-	}
+        // Reduce log verbosity - only log non-empty ASCII values or at debug
+        // level
+        if (!ascii.empty()) {
+          std::cerr << "Info [DICE]: RX[" << i << "] " << regName << ": '"
+                    << ascii << "'" << std::endl;
+        }
 
-	// Helper to read RX stream parameters using progressive discovery
-	void readDiceRxStreamRegisters(IOFireWireDeviceInterface **deviceInterface, io_service_t service,
-																 FireWireDevice &device, uint64_t discoveredDiceBase, UInt32 generation,
-																 uint32_t rxStreamSizeQuadlets)
-	{
-		// Skip if invalid size
-		if (rxStreamSizeQuadlets == 0)
-		{
-			std::cerr << "Debug [DICE]: Skipping RX stream register read (invalid size=" << rxStreamSizeQuadlets << ")." << std::endl;
-			return;
-		}
+        // Detailed register info only at debug level
+        if (logger_)
+          logger_->debug("RX[{}] {} (0x{:x}): 0x{:x}", i, regName, fullAddr,
+                         swappedValue);
 
-		// Store the original reported count for reference
-		uint32_t reportedStreamCount = device.rxStreamCount;
+        // Validate register content based on register type
+        if (regName == "ISOC") {
+          // ISOC register: Check if value is between 0-63 (inclusive)
+          if (swappedValue > 63 &&
+              swappedValue !=
+                  0xFFFFFFFF) // 0xFFFFFFFF might be used as "unassigned"
+          {
+            std::cerr << "Warning [DICE]: RX[" << i << "] ISOC value ("
+                      << swappedValue << ") is outside valid range (0-63)"
+                      << std::endl;
+          }
+        } else if (regName == "Audio Channels") {
+          // NB_AUDIO register: Check if value is non-zero and within reasonable
+          // limit
+          if (swappedValue == 0) {
+            std::cerr << "Warning [DICE]: RX[" << i
+                      << "] Audio Channels value is zero" << std::endl;
+          } else if (swappedValue > 32) // Reasonable upper limit
+          {
+            std::cerr << "Warning [DICE]: RX[" << i
+                      << "] Audio Channels value (" << swappedValue
+                      << ") exceeds reasonable limit (32)" << std::endl;
+          }
+        } else if (regName == "MIDI") {
+          // MIDI register: Check if value is within reasonable limit
+          if (swappedValue > 16) // Reasonable upper limit for MIDI channels
+          {
+            std::cerr << "Warning [DICE]: RX[" << i << "] MIDI value ("
+                      << swappedValue << ") exceeds reasonable limit (16)"
+                      << std::endl;
+          }
+        } else if (regName == "Sequence Start") {
+          // SEQ_START register: No specific validation criteria yet
+        } else if (regName == "Names Base") {
+          // NAMES_BASE register: Check if value is plausible within DICE
+          // address space
+          if (swappedValue == 0 ||
+              swappedValue > 0x1000000) // Arbitrary large value
+          {
+            std::cerr << "Warning [DICE]: RX[" << i << "] Names Base value (0x"
+                      << std::hex << swappedValue << std::dec
+                      << ") seems implausible" << std::endl;
+          } else {
+            // Convert quadlet offset to absolute address
+            uint64_t channelNamesAddr =
+                discoveredDiceBase + (static_cast<uint64_t>(swappedValue) * 4);
+            std::cerr << "Info [DICE]: RX[" << i << "] Names Base points to 0x"
+                      << std::hex << channelNamesAddr << std::dec << std::endl;
 
-		// Set a reasonable upper bound for exploration
-		// This is not a hardcoded limit, just a safety cap for exploration
-		const uint32_t MAX_REASONABLE_STREAMS = 16;
-		uint32_t maxStreamsToExplore = (reportedStreamCount == 0) ? MAX_REASONABLE_STREAMS : std::min(reportedStreamCount, MAX_REASONABLE_STREAMS);
-
-		if (reportedStreamCount > MAX_REASONABLE_STREAMS)
-		{
-			std::cerr << "Warning [DICE]: Reported RX stream count (" << reportedStreamCount
-								<< ") exceeds reasonable limit. Will explore up to "
-								<< MAX_REASONABLE_STREAMS << " streams." << std::endl;
-		}
-		else if (reportedStreamCount == 0)
-		{
-			std::cerr << "Warning [DICE]: No RX streams reported. Will explore up to "
-								<< MAX_REASONABLE_STREAMS << " streams to discover actual count." << std::endl;
-		}
-
-		std::cerr << "Info [DICE]: Starting progressive discovery of RX streams..." << std::endl;
-
-		// Find RX Parameter Space Offset (needs to be read first)
-		uint64_t rxParamSpaceOffsetAddr = discoveredDiceBase + DICE_REGISTER_RX_PAR_SPACE_OFF;
-		uint32_t rxParamSpaceOffsetQuadlets = 0;
-		if (device.diceRegisters.count(rxParamSpaceOffsetAddr))
-		{
-			rxParamSpaceOffsetQuadlets = CFSwapInt32LittleToHost(device.diceRegisters[rxParamSpaceOffsetAddr]);
-		}
-		else
-		{
-			std::cerr << "Warning [DICE]: RX Parameter Space Offset not previously read. Cannot read RX stream details." << std::endl;
-			return;
-		}
-		uint64_t rxParamSpaceBase = discoveredDiceBase + (rxParamSpaceOffsetQuadlets * 4);
-		std::cerr << "Debug [DICE]: RX Parameter Space Base Address: 0x" << std::hex << rxParamSpaceBase << std::dec << std::endl;
-
-		// Define key registers to check for each stream
-		// We'll use a smaller set of critical registers as "probe" registers
-		std::vector<std::pair<uint64_t, std::string>> probeRegisters = {
-				{DICE_REGISTER_RX_ISOC_BASE, "ISOC"},
-				{DICE_REGISTER_RX_NB_AUDIO_BASE, "Audio Channels"}};
-
-		// Define all registers to read for valid streams
-		std::map<uint64_t, std::string> allRxStreamRegs = {
-				{DICE_REGISTER_RX_ISOC_BASE, "ISOC"},
-				{DICE_REGISTER_RX_SEQ_START_BASE, "Sequence Start"},
-				{DICE_REGISTER_RX_NB_AUDIO_BASE, "Audio Channels"},
-				{DICE_REGISTER_RX_MIDI_BASE, "MIDI"},
-				{DICE_REGISTER_RX_NAMES_BASE, "Names Base"},
-				{DICE_REGISTER_RX_AC3_CAPABILITIES_BASE, "AC3 Capabilities"},
-				{DICE_REGISTER_RX_AC3_ENABLE_BASE, "AC3 Enable"}};
-
-		// Track valid streams and failures
-		uint32_t validStreamCount = 0;
-		uint32_t consecutiveFailures = 0;
-		const uint32_t MAX_CONSECUTIVE_FAILURES = 3;
-
-		// Progressive discovery loop
-		for (uint32_t i = 0; i < maxStreamsToExplore; ++i)
-		{
-			uint64_t streamInstanceOffsetBytes = i * rxStreamSizeQuadlets * 4;
-			bool streamValid = false;
-
-			// Reduced logging - only log at higher level
-			if (logger_)
-				logger_->debug("Probing RX stream [{}]...", i);
-
-			// Try to read the probe registers for this stream
-			for (const auto &regPair : probeRegisters)
-			{
-				uint64_t regRelativeOffset = regPair.first;
-				const std::string &regName = regPair.second;
-				uint64_t fullAddr = rxParamSpaceBase + streamInstanceOffsetBytes + regRelativeOffset;
-				UInt32 value = 0;
-
-				IOReturn status = FWA::SCANNER::safeReadQuadlet(deviceInterface, service, fullAddr, value, generation);
-				if (status == kIOReturnSuccess)
-				{
-					// Successfully read this register
-					device.diceRegisters[fullAddr] = value; // Store raw BE value
-					UInt32 swappedValue = CFSwapInt32LittleToHost(value);
-					std::string ascii = FWA::SCANNER::interpretAsASCII(swappedValue);
-
-					// Reduce log verbosity - only log non-empty ASCII values or at debug level
-					if (!ascii.empty())
-					{
-						std::cerr << "Info [DICE]: RX[" << i << "] " << regName << ": '" << ascii << "'" << std::endl;
-					}
-					// Detailed register info only at debug level
-					if (logger_)
-						logger_->debug("RX[{}] {} (0x{:x}): 0x{:x}", i, regName, fullAddr, swappedValue);
-
-					streamValid = true; // Mark this stream as valid if at least one register reads successfully
-				}
-				else
-				{
-					std::cerr << "Warning [DICE]: Read failed for RX[" << i << "] " << regName
-										<< " (0x" << std::hex << fullAddr << ") (status: " << status << ")" << std::dec << std::endl;
-
-					// Don't increment consecutive failures here, only if the entire stream fails
-				}
-			}
-
-			if (streamValid)
-			{
-				// This stream is valid, increment counter
-				validStreamCount++;
-				consecutiveFailures = 0; // Reset failure counter on success
-
-				// Now read the rest of the registers for this stream
-				for (const auto &regPair : allRxStreamRegs)
-				{
-					// Skip registers we already read during probing
-					bool alreadyRead = false;
-					for (const auto &probeReg : probeRegisters)
-					{
-						if (probeReg.first == regPair.first)
-						{
-							alreadyRead = true;
-							break;
-						}
-					}
-					if (alreadyRead)
-						continue;
-
-					uint64_t regRelativeOffset = regPair.first;
-					const std::string &regName = regPair.second;
-					uint64_t fullAddr = rxParamSpaceBase + streamInstanceOffsetBytes + regRelativeOffset;
-					UInt32 value = 0;
-
-					IOReturn status = FWA::SCANNER::safeReadQuadlet(deviceInterface, service, fullAddr, value, generation);
-					if (status == kIOReturnSuccess)
-					{
-						device.diceRegisters[fullAddr] = value; // Store raw BE value
-						UInt32 swappedValue = CFSwapInt32LittleToHost(value);
-						std::string ascii = FWA::SCANNER::interpretAsASCII(swappedValue);
-
-						// Reduce log verbosity - only log non-empty ASCII values or at debug level
-						if (!ascii.empty())
-						{
-							std::cerr << "Info [DICE]: RX[" << i << "] " << regName << ": '" << ascii << "'" << std::endl;
-						}
-						// Detailed register info only at debug level
-						if (logger_)
-							logger_->debug("RX[{}] {} (0x{:x}): 0x{:x}", i, regName, fullAddr, swappedValue);
-					}
-					else
-					{
-						std::cerr << "Warning [DICE]: Read failed for RX[" << i << "] " << regName
-											<< " (0x" << std::hex << fullAddr << ") (status: " << status << ")" << std::dec << std::endl;
-						// Non-critical register, continue anyway
-					}
-				}
-			}
-			else
-			{
-				// This entire stream failed, increment consecutive failures
-				consecutiveFailures++;
-
-				if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES)
-				{
-					std::cerr << "Info [DICE]: Stopping RX stream discovery after " << consecutiveFailures
-										<< " consecutive stream failures." << std::endl;
-					break;
-				}
-			}
-		}
-
-		// Update the device's stream count based on our discovery
-		if (validStreamCount > 0)
-		{
-			if (validStreamCount != reportedStreamCount)
-			{
-				std::cerr << "Info [DICE]: Adjusting RX stream count from reported " << reportedStreamCount
-									<< " to discovered " << validStreamCount << " based on successful reads." << std::endl;
-				device.rxStreamCount = validStreamCount;
-			}
-			else
-			{
-				std::cerr << "Info [DICE]: Confirmed RX stream count of " << validStreamCount
-									<< " matches reported count." << std::endl;
-			}
-		}
-		else if (reportedStreamCount > 0)
-		{
-			std::cerr << "Warning [DICE]: No valid RX streams discovered. Keeping reported count of "
-								<< reportedStreamCount << " for reference." << std::endl;
-		}
-		else
-		{
-			std::cerr << "Warning [DICE]: No valid RX streams discovered and none reported." << std::endl;
-			device.rxStreamCount = 0;
-		}
-	}
+            // Store this as a potential channel names address if we don't have
+            // one yet
+            if (device.channelNamesBaseAddr == DICE_INVALID_OFFSET) {
+              device.channelNamesBaseAddr = channelNamesAddr;
+              std::cerr
+                  << "Info [DICE]: Setting device.channelNamesBaseAddr to 0x"
+                  << std::hex << channelNamesAddr << std::dec << " from RX["
+                  << i << "] Names Base" << std::endl;
+            }
+          }
+        } else if (regName.find("AC3") != std::string::npos) {
+          // AC3_* registers: No specific validation yet, but could be added if
+          // patterns are known
+        }
+      } else {
+        std::cerr << "Warning [DICE]: Read failed for RX[" << i << "] "
+                  << regName << " (0x" << std::hex << fullAddr
+                  << ") (status: " << status << ")" << std::dec << std::endl;
+      }
+    }
+  }
+}
 
 } // namespace FWA::SCANNER

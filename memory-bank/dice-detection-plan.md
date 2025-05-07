@@ -1,3 +1,6 @@
+---
+**STATUS UPDATE (2025-05-06):** While the core driver changes outlined in this plan are still pending (see `progress.md`), significant related progress has been made in the `firewire_scanner` tool. The scanner now successfully implements **Dynamic DICE Base Address Discovery**, replacing hardcoded addresses. This provides a validated approach that can inform the eventual implementation of this plan for the main driver components.
+---
 # Plan: Fixing DICE Device Detection (2025-05-03)
 
 ## Goal

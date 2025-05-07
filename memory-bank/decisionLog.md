@@ -1,22 +1,128 @@
 # Decision Log
 
-This file records architectural and implementation decisions using a list format.
-YYYY-MM-DD HH:MM:SS - Log of updates made.
+[2025-05-06 16:18:20] - DICE Register Access Strategy Update
 
-*
+Decision: Implemented space-aware register access logic to handle different DICE register spaces appropriately.
 
-## Decision
+Rationale:
+- Different register spaces (Core, EAP, Subsystem) require different access methods
+- Core registers (Global/TX/RX) work best with ReadQuadlet
+- EAP and Subsystem registers require Read method
+- Previous simple threshold-based approach caused 0xe0008017 errors
 
-*   Initialize Memory Bank to maintain project context.
+Implementation:
+1. Added register space identification in io_helpers.cpp
+2. Modified readQuadlet to use appropriate method based on space
+3. Added comprehensive test function to validate access across all spaces
+4. Enhanced logging to track successful reads and their values
 
-## Rationale
+Implications:
+- More reliable access to extended register ranges
+- Better debugging through space-aware logging
+- Foundation for implementing EAP functionality
+- Improved compatibility with different DICE variants
 
-*   Requested by the user to persist information across sessions.
-*   Helps track progress, decisions, and context for a complex project.
+[2025-05-06 16:08:46] - DICE Register Access Strategy Change
 
-## Implementation Details
+**Decision:** Switch to using standard DICE register bases (0xffffe0000000) instead of dynamically discovered pointers.
 
-*   Created standard Memory Bank files: `productContext.md`, `activeContext.md`, `progress.md`.
+**Context:**
+- Scanner was failing to access registers using dynamically discovered pointers (0x10000170d000081, etc.)
+- These addresses were causing 0xe0008016 (type error) and 0xe0008017 (address error) issues
+
+**Rationale:**
+1. FFADO uses fixed base addresses successfully
+2. Standard bases (0xffffe0000000) are well-documented and tested
+3. Dynamic pointer discovery may be useful for future features but isn't required for basic operation
+
+**Impact:**
+- Core DICE registers now accessible (Owner, Notification, Clock, etc.)
+- TX/RX stream registers working at standard offsets
+- Some extended register areas still inaccessible (to be investigated)
+- Raw pointer values preserved for future reference/investigation
+
+**Next Steps:**
+1. Document the discovered pointer values for future investigation
+2. Consider implementing a fallback mechanism: try dynamic pointers first, fall back to standard bases
+3. Investigate remaining 0xe0008017 errors in extended register ranges
+
+[2025-05-06 16:46:50] - EAP Space Access Strategy
+
+**Decision:** Implement structured EAP space access with section-aware logging and experimental address transformation.
+
+**Context:**
+- EAP space (0x200000-0xF00000) contains critical device configuration
+- Previous approach used block reads but lacked section awareness
+- Need better understanding of EAP space organization and access patterns
+
+**Technical Details:**
+1. EAP Section Organization:
+   - Capability (0x0000): Device features
+   - Command (0x0008): Control interface
+   - Mixer (0x0010): Audio routing
+   - Peak (0x0018): Level monitoring
+   - New Routing (0x0020): Enhanced routing
+   - Stream Config (0x0028): Stream settings
+   - Current Config (0x0030): Active state
+   - Standalone Config (0x0038): Offline settings
+   - App (0x0040): Custom data
+
+2. Access Improvements:
+   - Enhanced logging with section identification
+   - Offset analysis (base, section, sub-offset)
+   - ASCII interpretation for readable values
+   - Experimental address transformation (0xFFFFE0200000)
+
+**Rationale:**
+1. Section-aware access helps understand device configuration
+2. ASCII interpretation reveals device capabilities
+3. Address transformation may improve access reliability
+
+**Impact:**
+- Successfully reading core EAP sections (0x0-0x30)
+- Better understanding of device configuration
+- Improved debugging through detailed logging
+- Potential path to more reliable EAP access
+
+**Next Steps:**
+1. Validate address transformation approach
+2. Document EAP section contents and usage
+3. Consider integrating into driver implementation
+
+[2025-05-06 16:37:11] - FireWire Address Space Mapping Strategy
+
+**Decision:** Implement address space transformation for subsystem registers while maintaining standard base addresses.
+
+**Context:**
+- Previous change to use standard bases (0xffffe0000000) improved core register access
+- Subsystem registers (GPCSR, DICE, AVS) were still experiencing address errors
+- Analysis showed subsystem addresses needed special handling
+
+**Technical Details:**
+1. Address Components:
+   - Prefix (0xFFFFE0): Standard FireWire address space identifier
+   - Offset: Register-specific location within space
+   - Subsystem Base: Additional offset for subsystem spaces (0xC7000000+)
+
+2. Transformation Rules:
+   - Core spaces (Global, TX, RX): Use direct standard base + offset
+   - Subsystem spaces: Transform to match FireWire address space format
+   - EAP space: Use block read operations with original addresses
+
+**Rationale:**
+1. FireWire protocol expects consistent address space prefix
+2. Subsystem addresses need mapping to match this expectation
+3. Enhanced logging helps track address transformations
+
+**Impact:**
+- Successfully reading from transformed subsystem addresses
+- Cleaner error reporting with address transformation details
+- Better understanding of FireWire address space requirements
+
+**Next Steps:**
+1. Document address transformation patterns for future reference
+2. Consider implementing similar transformations for EAP space
+3. Investigate if dynamic pointers follow similar patterns
 *   Will create `decisionLog.md` and `systemPatterns.md`.
 ---
 [2025-05-03 06:32:26] - Decision: Modify device discovery and AudioDevice initialization to handle generic IOFireWireDevice services directly.
@@ -73,3 +179,36 @@ Implementation Details: Modify IOKitFireWireDeviceDiscovery::deviceAdded, AudioD
 Rationale: This implements Strategy A from the architect's plan to address `kIOReturnNotResponding` errors encountered when using `ReadQuadlet` for high addresses, specifically targeting the DICE register space. `ReadBlock` might be more suitable for accessing these memory regions.
 Implementation Details: Added a conditional check for the address. If &gt;= threshold, call `ReadBlock` requesting 4 bytes. Otherwise, call the original `ReadQuadlet`. Error handling is maintained for both paths.
 Implications: This change might resolve the read errors for high addresses, enabling successful interaction with DICE registers. Testing is required to confirm.
+
+---
+[2025-05-06 00:54:00] - Decision: Implement FFADO-style dynamic base address discovery in `firewire_scanner` tool.
+Rationale: To investigate if using dynamically discovered base addresses (like FFADO) resolves the `kIOReturnNotResponding` error when reading DICE registers. Using the scanner as a Proof-of-Concept before modifying the core driver.
+Implementation Details: 1. Create `src/tools/scanner/scanner_defines.hpp` for FFADO-related constants. 2. Verify FFADO offsets. 3. Modify scanner code (`dice_helpers.cpp`, etc.) to read base address pointers and calculate target addresses using dynamic_base + relative_offset. 4. Test scanner against DICE device.
+Implications: If successful, this approach could unblock register reading and provide a validated method for the core driver. If unsuccessful, it rules out one potential cause of the read error.
+
+---
+[2025-05-06 17:42:00] - Conditional EAP Support
+## Decision
+Implement conditional EAP (Extended Application Protocol) support in `DiceAudioDevice`. EAP will be disabled for devices known to be incompatible (e.g., Midas Venice F32) based on a blacklist of Vendor and Model IDs. For other devices, EAP initialization will proceed, and if it fails, EAP support will be disabled for that session.
+
+## Rationale
+The Midas Venice F32 is known to cause issues when EAP is accessed (based on FFADO logs). Other DICE devices might have similar incompatibilities or might not implement EAP correctly. This approach allows EAP functionality for compatible devices while preventing crashes or undefined behavior on incompatible ones. The blacklist provides a definitive way to disable EAP for known problematic devices, while the runtime check during EAP initialization handles devices not on the blacklist that might still fail EAP setup.
+
+## Implementation Details
+1.  **`include/FWA/DiceDefines.hpp`**:
+    *   Added `struct DeviceIdentifier` to hold `vendorId` and `modelId`.
+    *   Added `const std::set<DeviceIdentifier> EAP_UNSUPPORTED_DEVICES` initialized with the Midas Venice F32 (Vendor ID: `0x10c73f`, Model ID: `0x00000001`).
+2.  **`include/FWA/DiceAudioDevice.h`**:
+    *   Added a private boolean member `m_supportsEAP` (defaulting to `true`).
+    *   Modified `getEAP()` to return `eap_.get()` only if `m_supportsEAP` is true, otherwise returns `nullptr`.
+3.  **`src/FWA/DiceAudioDevice.cpp`** (in `init()` method):
+    *   After basic device initialization and I/O function setup, retrieve the current device's `vendorId` and `modelId` (using `getDeviceInfo()`).
+    *   Create a `DICE::DeviceIdentifier` for the current device.
+    *   Check if this identifier is present in `DICE::EAP_UNSUPPORTED_DEVICES`.
+        *   If found, set `m_supportsEAP = false` and log that EAP is disabled for this known device.
+        *   If not found in the blacklist, proceed with the existing `DiceEAP::supportsEAP(*this)` check.
+            *   If this check passes, attempt `eap_->init()`.
+                *   If `eap_->init()` fails, set `m_supportsEAP = false` and log the EAP initialization failure. `eap_` and `router_` are reset.
+                *   If `eap_->init()` succeeds, `m_supportsEAP` remains `true`, and router initialization proceeds.
+            *   If `DiceEAP::supportsEAP(*this)` fails, set `m_supportsEAP = false`.
+    *   Added a final check: if `!m_supportsEAP`, ensure `eap_` and `router_` unique_ptrs are reset.

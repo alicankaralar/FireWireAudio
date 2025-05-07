@@ -15,14 +15,19 @@ namespace FWA::SCANNER {
 FireWireDevice getDeviceInfo(io_service_t device);
 
 // Safe wrapper for ReadQuadlet that uses setjmp/longjmp for segfault recovery
+// Set forceQuadlet to true to always use ReadQuadlet regardless of address (for
+// DICE registers)
 IOReturn safeReadQuadlet(IOFireWireDeviceInterface **deviceInterface,
                          io_service_t service, uint64_t absoluteAddr,
-                         UInt32 &value, UInt32 generation);
+                         UInt32 &value, UInt32 generation,
+                         bool forceQuadlet = false);
 
 // Basic ReadQuadlet wrapper (gets generation if needed)
+// Set forceQuadlet to true to always use ReadQuadlet regardless of address (for
+// DICE registers)
 IOReturn readQuadlet(IOFireWireDeviceInterface **deviceInterface,
                      io_service_t service, uint64_t absoluteAddr, UInt32 &value,
-                     UInt32 generation);
+                     UInt32 generation, bool forceQuadlet = false);
 
 // Safe wrapper for ReadBlock that uses setjmp/longjmp for segfault recovery
 IOReturn safeReadBlock(

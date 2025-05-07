@@ -1,3 +1,6 @@
+---
+**STATUS UPDATE (2025-05-06):** The `firewire_scanner` tool has undergone a "Comprehensive Channel Name Extraction Overhaul" which successfully identifies channel names, types, and counts. This provides a strong foundation and validated data source for the integration steps outlined in this plan. However, the actual integration of this information into `DiceAudioDevice.cpp` as detailed below is likely still pending.
+---
 # DICE Channel Integration Plan
 
 This document outlines the plan to integrate the channel configuration information discovered by the scanner tool into the DICE driver implementation.

@@ -13,41 +13,53 @@
 #include <memory>          // For std::shared_ptr
 #include <spdlog/spdlog.h> // For spdlog::logger
 
-#include "FWA/DiceDefines.hpp" // Include relative to project root
+#include "FWA/DiceAbsoluteAddresses.hpp" // Include for enums/constants
 
 namespace FWA::SCANNER {
+// Forward declaration of DeviceEndianness enum class
+enum class DeviceEndianness;
+
 // Define FireWireDevice struct first
 struct FireWireDevice {
   uint64_t guid;
   std::string name;
   std::string vendor;
-  FWA::DICE::DiceChipType diceChipType = FWA::DICE::DiceChipType::Unknown;
-  std::map<uint64_t, uint32_t> diceRegisters; // Stores raw Big Endian values
+  DiceChipType diceChipType = DiceChipType::Unknown;
+  std::map<uint64_t, uint32_t>
+      diceRegisters; // Stores raw values as read from device
+
+  // Device endianness (detected during scan)
+  DeviceEndianness deviceEndianness;
+
+  // Config ROM vendor keys (used for endianness detection)
+  std::map<uint32_t, uint64_t> configRomVendorKeys;
 
   // TX/RX stream configuration
   uint32_t txStreamCount = 0;
   uint32_t rxStreamCount = 0;
 
   // Configuration based on sample rate
-  FWA::DICE::DiceConfig currentConfig = FWA::DICE::DiceConfig::Unknown;
+  DiceConfig currentConfig = DiceConfig::Unknown;
   // Configuration based on sample rate
 
   // New fields for detailed device information
-  FWA::DICE::ClockSource syncSource = FWA::DICE::ClockSource::Unknown;
-  FWA::DICE::RouterFrameSyncMode routerFsMode =
-      FWA::DICE::RouterFrameSyncMode::Unknown;
+  ClockSource syncSource = ClockSource::Unknown;
+  RouterFrameSyncMode routerFsMode = RouterFrameSyncMode::Unknown;
   bool aesLocked = false;
   uint8_t mixerRxChannels = 0;
   uint8_t avsRxChannelId = 0;
   uint8_t avsRxDataBlockSize = 0;
   uint8_t avsTxDataBlockSize = 0;
-  FWA::DICE::AvsSystemMode avsTxSystemMode = FWA::DICE::AvsSystemMode::Unknown;
+  AvsSystemMode avsTxSystemMode = AvsSystemMode::Unknown;
 
   // Determined DICE base addresses
-  uint64_t diceGlobalBase = DICE_INVALID_OFFSET;
-  uint64_t diceTxBase = DICE_INVALID_OFFSET;
-  uint64_t diceRxBase = DICE_INVALID_OFFSET;
+  uint64_t diceGlobalBase = DICE_INVALID_OFFSET; // Use constexpr variable
+  uint64_t diceTxBase = DICE_INVALID_OFFSET;     // Use constexpr variable
+  uint64_t diceRxBase = DICE_INVALID_OFFSET;     // Use constexpr variable
   std::string diceBaseDeterminationMethod = "Unknown";
+
+  // Channel names base address (dynamically discovered)
+  uint64_t channelNamesBaseAddr = DICE_INVALID_OFFSET;
 };
 
 // Forward declare the main class
@@ -56,12 +68,6 @@ class FireWireScanner;
 // Helper function declarations (implementations in separate .cpp files)
 // Now they can use the fully defined FireWireDevice struct
 FireWireDevice getDeviceInfo(io_service_t device); // Changed return type
-IOReturn safeReadQuadlet(IOFireWireDeviceInterface **deviceInterface,
-                         io_service_t service, uint64_t absoluteAddr,
-                         UInt32 &value, UInt32 generation);
-IOReturn readQuadlet(IOFireWireDeviceInterface **deviceInterface,
-                     io_service_t service, uint64_t absoluteAddr, UInt32 &value,
-                     UInt32 generation);
 uint64_t parseConfigRom(IOFireWireDeviceInterface **deviceInterface,
                         io_service_t service, uint32_t targetKey,
                         UInt32 generation);
@@ -73,7 +79,7 @@ void printDeviceInfo(
 void exploreDiceMemoryLayout(
     IOFireWireDeviceInterface **deviceInterface, io_service_t service,
     FireWireDevice &device, UInt32 generation,
-    uint64_t baseAddr = DICE_REGISTER_BASE); // Removed FireWireScanner:: prefix
+    uint64_t baseAddr = DICE_REGISTER_BASE); // Use constexpr variable
 void exploreChannelNamesArea(
     IOFireWireDeviceInterface **deviceInterface, io_service_t service,
     FireWireDevice &device,

@@ -10,6 +10,12 @@ YYYY-MM-DD HH:MM:SS - Log of updates made.
 *   Initialized Memory Bank (`productContext.md`, `activeContext.md`, `progress.md`, `decisionLog.md`, `systemPatterns.md`).
 *   Analyzed DICE device detection issue: Identified problem in `AudioDevice::init()` registry traversal assumption.
 *   [2025-05-03 06:32:39] - Approved plan to modify `IOKitFireWireDeviceDiscovery.cpp` and `AudioDevice.cpp/h`.
+*   [2025-05-06 12:48:00] - Completed significant `firewire_scanner` tool enhancements:
+    *   Implemented Dynamic DICE Base Address Discovery (replaces hardcoded addresses).
+    *   Implemented Robust RX/TX Stream Register Reading (dynamic counts, content validation).
+    *   Overhauled Channel Name Extraction (dynamic location, endianness, advanced regex, improved byte-level handling).
+    *   Verified existing features: Channel name deduplication and channel count validation.
+    *   The `firewire_scanner` tool now compiles successfully after these improvements and minor fixes.
 
 ## Current Tasks
 
@@ -23,6 +29,10 @@ YYYY-MM-DD HH:MM:SS - Log of updates made.
 *   Address potential issues with AVC command interface creation/usage if needed.
 *   [2025-05-06 00:23:00] - Analyzed `ref/libffado-2.4.9` source code (DICE implementation) and synthesized insights.
 *   [2025-05-06 00:01:00] - Synthesized key information from DICE reference documentation (`ref/dice.c`, `ref/dice docs/*.pdf`).
+*   [2025-05-06 00:57:00] - Create `src/tools/scanner/scanner_defines.hpp` for FFADO/scanner constants.
+*   [2025-05-06 00:57:00] - Verify FFADO offsets for dynamic base pointers and relative registers.
+*   [2025-05-06 00:57:00] - Implement dynamic base address discovery logic in `src/tools/scanner/dice_helpers.cpp`.
+*   [2025-05-06 00:57:00] - Test `firewire_scanner` with dynamic discovery against DICE device.
 
 [2025-05-03 08:08:53] - Completed debugging firewire_scanner for DICE base address discovery. Identified 0xFFFFF0000000 via Config ROM key 0xD1. Blocked by kIOReturnNotResponding (-536838121) on reads in this range. Next: External research on error.
 [2025-05-03 08:15:21] - New Task: Refactor src/tools/firewire_scanner.cpp into smaller files (<250 lines) within a new src/tools/scanner/ directory. Remove redundant code (bruteforce scan, getDeviceGuid). Update CMakeLists.txt.
@@ -53,3 +63,51 @@ YYYY-MM-DD HH:MM:SS - Log of updates made.
 *   [2025-05-06 00:23:00] - Update Memory Bank files (`productContext.md`, `systemPatterns.md`, `activeContext.md`, `progress.md`) with synthesized information from DICE docs, `ref/dice.c`, `ref/libhitaki`, and `ref/libffado`.
 
 [2025-05-05 22:42:20] - Completed refactoring of DICE base address discovery logic in `src/tools/scanner/dice_helpers.cpp`. Extracted logic into helper functions, replaced `std::cerr` with logging, added robustness checks, and cleaned up `readDiceRegisters`.
+
+[2025-05-06 14:39:11] - Analyzed FFADO log for Venice F32 device and added detailed information to ffado-research-summary.md. The analysis includes device identification, DICE parameter space layout, channel configuration (24 mono + 4 stereo pairs for both input and output), clock information, notable issues, and register access strategy details.
+
+[2025-05-06 16:09:30] - Improved DICE register access in firewire_scanner by switching to standard DICE register bases (0xffffe0000000). Successfully reading core registers (Owner, Notification, Clock, Sample Rate) and TX/RX stream registers. Discovered but preserved raw pointer values for future investigation:
+  * Global: 0x10000170d000081
+  * TX[0]: 0xc087000c010000d1
+  * RX[0]: 0x100001301000017
+
+[2025-05-06 16:36:30] - Enhanced firewire_scanner address handling:
+  * Added detailed address component logging (prefix, offset, space identification)
+  * Implemented subsystem address transformation to match FireWire address space format
+  * Improved error reporting with address transformation details
+  * Successfully reading from transformed base addresses and subsystem spaces
+  * Reduced redundant error messages for cleaner output
+
+[2025-05-06 16:46:36] - Enhanced EAP space access in firewire_scanner:
+* Added detailed section identification (Capability, Mixer, etc.)
+* Implemented offset analysis (base, section, sub-offset)
+* Added ASCII interpretation for readable values
+* Successfully reading core EAP sections (0x0-0x30)
+* Identified device name and channel strings
+* Experimental address transformation (0xFFFFE0200000) shows promise
+
+[2025-05-06 16:51:06] - Validated enhanced EAP space access on Venice device:
+* Confirmed 100% success rate for core EAP sections (0x0-0x30)
+* Verified section boundaries and identification accuracy
+* Successfully extracted device name ("Venice") and channel strings
+* Validated address transformation (0xFFFFE0200000)
+* Key register values:
+  - Global Owner: 0xa000000
+  - TX Stream Size: 0x4348345c
+  - RX Stream Size: 0x0
+
+[2025-05-06 16:53:21] - Integrated EAP space improvements into DICE driver:
+* Added EAP section constants and identification to DiceDefines.hpp
+* Implemented section-aware access methods in DiceAudioDevice
+* Added address transformation support with validation
+* Enhanced logging with section identification and ASCII interpretation
+* Added protection for read-only sections
+* Improved error handling with bounds checking
+
+---
+[2025-05-06 17:45:30] - Task Started: Implement Conditional EAP Support
+- Added `DeviceIdentifier` struct and `EAP_UNSUPPORTED_DEVICES` set to `DiceDefines.hpp`.
+- Added `m_supportsEAP` flag and updated `getEAP()` in `DiceAudioDevice.h`.
+- Modified `DiceAudioDevice::init()` to check blacklist and handle EAP initialization conditionally.
+- Updated `decisionLog.md`, `systemPatterns.md`, and `activeContext.md`.
+[2025-05-06 18:22:49] - Completed corrections for macro and function call scoping in `src/FWA/DiceAudioDevice.cpp`.

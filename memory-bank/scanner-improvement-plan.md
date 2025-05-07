@@ -1,3 +1,12 @@
+---
+**STATUS UPDATE (2025-05-06):** Significant portions of this plan have been implemented as part of the `firewire_scanner` tool enhancements.
+Key completed areas include:
+*   Dynamic DICE Base Address Discovery (Section 1.1)
+*   Robust RX/TX Stream Register Reading (Section 3)
+*   Comprehensive Channel Name Extraction Overhaul (Sections 1.2, 1.3, 2.1, 2.2, 4.1)
+*   Channel Count Validation Systems (Sections 1.3, 3.2, 3.3, 4.2, 4.3)
+The scanner now compiles successfully with these improvements.
+---
 # FireWire Scanner Improvement Plan
 
 This document outlines a plan to improve the firewire_scanner tool to make it more dynamic, remove duplicated logic, and improve how it reads RX/TX registers and discovers channels.
@@ -402,13 +411,13 @@ static void readDiceTxStreamRegistersInternal(IOFireWireDeviceInterface **device
     uint32_t maxStreams = 0;
     switch (device.diceChipType)
     {
-    case FWA::DICE::DiceChipType::DiceII:
+    case DiceChipType::DiceII:
         maxStreams = 4;
         break;
-    case FWA::DICE::DiceChipType::DiceMini:
+    case DiceChipType::DiceMini:
         maxStreams = 2;
         break;
-    case FWA::DICE::DiceChipType::DiceJr:
+    case DiceChipType::DiceJr:
         maxStreams = 1;
         break;
     default:
@@ -446,15 +455,15 @@ void validateStreamCounts(FireWireDevice &device)
     
     switch (device.diceChipType)
     {
-    case FWA::DICE::DiceChipType::DiceII:
+    case DiceChipType::DiceII:
         maxTxStreams = 4;
         maxRxStreams = 4;
         break;
-    case FWA::DICE::DiceChipType::DiceMini:
+    case DiceChipType::DiceMini:
         maxTxStreams = 2;
         maxRxStreams = 2;
         break;
-    case FWA::DICE::DiceChipType::DiceJr:
+    case DiceChipType::DiceJr:
         maxTxStreams = 1;
         maxRxStreams = 1;
         break;

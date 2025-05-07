@@ -8,35 +8,21 @@
 
 #include "scanner.hpp" // For FireWireDevice struct
 
-namespace FWA::SCANNER
-{
+// Include the new header files that replace functionality from this file
+#include "dice_base_discovery.hpp"
+#include "dice_config.hpp"
+#include "dice_register_readers.hpp"
 
-	/**
-	 * @brief Reads DICE-specific registers from the device.
-	 *
-	 * Attempts to discover the DICE register base address via Config ROM parsing.
-	 * Reads standard DICE registers (Version, Offsets, Counts, Sizes, etc.) relative to the discovered base.
-	 * Attempts to read EAP capabilities and configuration if available.
-	 * Reads per-stream parameters based on discovered/default stream counts.
-	 * Stores successfully read raw (Big Endian) register values in device.diceRegisters.
-	 * Updates device.txStreamCount, device.rxStreamCount, and device.diceChipType based on reads or defaults.
-	 *
-	 * @param deviceInterface Pointer-to-pointer to an opened IOFireWireDeviceInterface.
-	 * @param service The io_service_t representing the FireWire nub.
-	 * @param device Reference to the FireWireDevice struct to populate.
-	 */
-	void readDiceRegisters(IOFireWireDeviceInterface **deviceInterface,
-												 io_service_t service,
-												 FireWireDevice &device);
+namespace FWA::SCANNER {
+// All functionality has been moved to the following files:
+// - dice_base_discovery.hpp/cpp: Base address discovery
+// - dice_register_readers.hpp/cpp: Register reading functions
+// - dice_config.hpp/cpp: Configuration and main register reading
+// - dice_stream_registers.hpp/cpp: Stream register reading
+// - eap_helpers.hpp/cpp: EAP functionality
 
-	/**
-	 * @brief Sets default TX/RX stream counts based on the detected chip type.
-	 *
-	 * Used as a fallback if EAP or standard register reads fail.
-	 *
-	 * @param device Reference to the FireWireDevice struct to update.
-	 */
-	void setDefaultDiceConfig(FireWireDevice &device);
+// This header is kept for backward compatibility
+// Use the specific headers for new code
 
 } // namespace FWA::SCANNER
 

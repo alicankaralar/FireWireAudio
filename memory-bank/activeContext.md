@@ -1,5 +1,39 @@
 # Active Context
 
+## Current Focus
+[2025-05-06 16:37:52] - FireWire Address Space Mapping
+
+Currently focused on improving register access across all DICE address spaces:
+- Successfully implemented address space transformation for subsystem registers
+- Enhanced logging provides detailed address component analysis
+- Cleaner error reporting helps track address transformation issues
+- Improved understanding of FireWire address space requirements
+
+## Recent Changes
+- Added detailed address component logging in io_helpers.cpp:
+  * Prefix analysis (0xFFFFE0 vs others)
+  * Offset tracking for different spaces
+  * Subsystem address transformation
+- Implemented subsystem address transformation:
+  * Maps 0xC7000000+ addresses to FireWire format
+  * Preserves register offsets while updating prefix
+  * Uses block reads for transformed addresses
+- Improved error reporting:
+  * Shows original and transformed addresses
+  * Provides space-specific context for errors
+  * Tracks successful reads with values
+
+## Open Questions/Issues
+1. Can we apply similar transformation patterns to EAP space?
+2. Do the dynamic pointers follow a consistent transformation pattern?
+3. Are there other subsystem spaces we haven't discovered yet?
+4. How can we optimize the address transformation logic?
+
+## Next Steps
+1. Document the address transformation patterns
+2. Investigate EAP space access patterns
+3. Consider implementing a unified address transformation layer
+
 This file tracks the project's current status, including recent changes, current goals, and open questions.
 YYYY-MM-DD HH:MM:SS - Log of updates made.
 
@@ -13,6 +47,7 @@ YYYY-MM-DD HH:MM:SS - Log of updates made.
 
 *   Updating Memory Bank files with synthesized information from DICE docs, `ref/dice.c`, `ref/libhitaki`, and `ref/libffado`.
 
+*   [2025-05-06 00:55:00] - Current Focus: Planning and implementing FFADO-style dynamic base address discovery in the `firewire_scanner` tool as a PoC to investigate `kIOReturnNotResponding` error.
 ## Recent Changes
 *   Created `memory-bank/productContext.md`.
 
@@ -22,6 +57,7 @@ YYYY-MM-DD HH:MM:SS - Log of updates made.
 
 ## Open Questions/Issues
 *   Specific nature of DICE chipset problems.
+*   [2025-05-06 00:55:00] - Open Questions/Issues: Will the FFADO dynamic base address discovery approach resolve the `kIOReturnNotResponding` error in the scanner? What are the exact, verified FFADO offsets for base address pointers and relative registers?
 *   Current state of the `firewire_scanner` tool and its output.
 ---
 [2025-05-03 08:09:20] - Current Focus: Investigating `kIOReturnNotResponding` (-536838121) error encountered when using `IOFireWireDeviceInterface::ReadQuadlet` in the 0xFFFFF0... address range on Midas Venice.
@@ -111,3 +147,20 @@ YYYY-MM-DD HH:MM:SS - Log of updates made.
 [2025-05-05 22:42:32] - **Current Focus:** Ready to compile the changes made to `dice_helpers.cpp` to check for errors.
 
 *   [2025-05-05 23:48:12] - Analyzed `ref/dice.c` (Linux kernel driver) and updated Memory Bank (`productContext.md`) with relevant hardware IDs and device-specific handling insights.
+
+---
+[2025-05-06 17:45:00] - Focus: Conditional EAP Implementation
+## Current Focus
+- Implementing conditional EAP support in `DiceAudioDevice` based on a device blacklist and runtime checks.
+
+## Recent Changes
+- Added `DeviceIdentifier` struct and `EAP_UNSUPPORTED_DEVICES` set to `include/FWA/DiceDefines.hpp`.
+- Added `m_supportsEAP` flag to `include/FWA/DiceAudioDevice.h` and updated `getEAP()` method.
+- Modified `DiceAudioDevice::init()` in `src/FWA/DiceAudioDevice.cpp` to check the blacklist and handle EAP initialization conditionally.
+- Updated `decisionLog.md` and `systemPatterns.md` with details of the conditional EAP approach.
+
+## Open Questions/Issues
+- Need to verify that `getDeviceInfo()` correctly provides Vendor and Model IDs within `DiceAudioDevice::init()`.
+- Need to test the conditional EAP logic with both supported and unsupported (Midas Venice) devices.
+
+[2025-05-06 18:22:06] - Corrected macro and function call scoping in `src/FWA/DiceAudioDevice.cpp` to remove `DICE::` namespace qualifier where it was not needed, as these are now directly included or are global.

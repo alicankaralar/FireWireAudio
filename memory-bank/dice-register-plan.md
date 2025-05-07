@@ -1,3 +1,12 @@
+---
+**STATUS UPDATE (2025-05-06):** Significant portions of this plan, particularly concerning the `firewire_scanner` tool, have been implemented.
+Key completed aspects for the scanner include:
+*   Improved read reliability due to dynamic base address discovery.
+*   Validated data interpretation for stream counts and sizes (dynamic counts are now used).
+*   Comprehensive content validation for read register values.
+*   Removal of artificial limits in stream count determination for the scanner.
+The `firewire_scanner` now demonstrates more robust RX/TX stream register reading. Further work on block reads and core `DiceAudioDevice` improvements may still be pending.
+---
 # Plan: Improve DICE Register Reading
 
 **Goal:** Improve the `firewire_scanner` and the underlying `DiceAudioDevice` class to read the device's capabilities (like TX/RX stream counts) accurately and efficiently, removing artificial limits and addressing unreliable reads and potentially incorrect data interpretation.

@@ -1,49 +1,90 @@
 #include "io_helpers.hpp"
-#include "scanner.hpp" // Include scanner.hpp for g_jmpBuf, g_segfaultOccurred
-
-#include <atomic>
-#include <iomanip> // For std::hex
-#include <iostream>
-#include <setjmp.h> // For setjmp/longjmp
-
+#include "scanner.hpp"
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
 #include <IOKit/firewire/IOFireWireLib.h>
+#include <atomic>
+#include <iomanip>
+#include <iostream>
+#include <setjmp.h>
 
 namespace FWA::SCANNER {
+// Helper function to identify DICE register space
+static std::string identifyDiceSpace(uint64_t absoluteAddr) {
+  // Remove the base address to get relative offset
+  uint64_t relativeAddr = absoluteAddr & 0x0FFFFFFFULL;
+
+  // Check EAP space first (it's a large range)
+  if (relativeAddr >= DICE_EAP_BASE &&
+      relativeAddr < (DICE_EAP_BASE + DICE_EAP_MAX_SIZE)) {
+    uint64_t eapOffset = relativeAddr - DICE_EAP_BASE;
+    std::string subspace;
+    if (eapOffset < 0x0004)
+      subspace = "Capability";
+    else if (eapOffset < 0x000C)
+      subspace = "Command";
+    else if (eapOffset < 0x0014)
+      subspace = "Mixer";
+    else if (eapOffset < 0x001C)
+      subspace = "Peak";
+    else if (eapOffset < 0x0024)
+      subspace = "NewRouting";
+    else if (eapOffset < 0x002C)
+      subspace = "NewStreamCfg";
+    else if (eapOffset < 0x0034)
+      subspace = "CurrCfg";
+    else if (eapOffset < 0x003C)
+      subspace = "StandAloneCfg";
+    else if (eapOffset < 0x0044)
+      subspace = "App";
+    else
+      subspace = "Unknown";
+    return "EAP:" + subspace + " (offset 0x" + std::to_string(eapOffset) + ")";
+  }
+
+  // Check subsystem spaces
+  if (relativeAddr >= 0xC7000000 && relativeAddr < 0xC8000000)
+    return "GPCSR (offset 0x" + std::to_string(relativeAddr - 0xC7000000) + ")";
+  if (relativeAddr >= 0xCE000000 && relativeAddr < 0xCF000000)
+    return "DICE Subsystem (offset 0x" +
+           std::to_string(relativeAddr - 0xCE000000) + ")";
+  if (relativeAddr >= 0xCF000000)
+    return "AVS Subsystem (offset 0x" +
+           std::to_string(relativeAddr - 0xCF000000) + ")";
+
+  // Check standard spaces
+  if (relativeAddr < 0x400)
+    return "Global (offset 0x" + std::to_string(relativeAddr) + ")";
+  if (relativeAddr >= 0x400 && relativeAddr < 0x800)
+    return "TX (offset 0x" + std::to_string(relativeAddr - 0x400) + ")";
+  if (relativeAddr >= 0x800 && relativeAddr < 0xC00)
+    return "RX (offset 0x" + std::to_string(relativeAddr - 0x800) + ")";
+
+  return "Unknown space";
+}
 
 // --- IOKit Helper Function Implementations ---
 
 FireWireDevice getDeviceInfo(io_service_t device) {
-  std::cerr << "Debug [IO]: Entering getDeviceInfo for service: " << device
-            << std::endl;
   FireWireDevice info;
-  info.guid = 0; // Initialize
+  info.guid = 0;
   info.name = "[Error]";
   info.vendor = "[Error]";
-  info.diceChipType = FWA::DICE::DiceChipType::Unknown; // Ensure initialized
+  info.diceChipType = DiceChipType::Unknown;
 
   CFMutableDictionaryRef properties = nullptr;
   IOReturn result = IORegistryEntryCreateCFProperties(
       device, &properties, kCFAllocatorDefault, kNilOptions);
 
   if (result == kIOReturnSuccess && properties != nullptr) {
-    // Get GUID
     CFTypeRef guidValue = CFDictionaryGetValue(properties, CFSTR("GUID"));
     if (guidValue != nullptr && CFGetTypeID(guidValue) == CFNumberGetTypeID()) {
       CFNumberRef guidNumber = (CFNumberRef)guidValue;
       if (!CFNumberGetValue(guidNumber, kCFNumberSInt64Type, &info.guid)) {
-        std::cerr << "Warning [IO]: Failed to get SInt64 value for GUID."
-                  << std::endl;
-        info.guid = 0; // Reset on failure
+        info.guid = 0;
       }
-    } else {
-      std::cerr << "Warning [IO]: GUID property not found or not a CFNumber."
-                << std::endl;
-      info.guid = 0; // Ensure it's 0 if not found
     }
 
-    // Get Name
     CFTypeRef nameValue =
         CFDictionaryGetValue(properties, CFSTR("FireWire Product Name"));
     if (nameValue != nullptr && CFGetTypeID(nameValue) == CFStringGetTypeID()) {
@@ -53,16 +94,12 @@ FireWireDevice getDeviceInfo(io_service_t device) {
                              kCFStringEncodingUTF8)) {
         info.name = nameBuffer;
       } else {
-        std::cerr << "Warning [IO]: Failed to get C string for FireWire "
-                     "Product Name (GUID: 0x"
-                  << std::hex << info.guid << std::dec << ")." << std::endl;
         info.name = "[Unknown Name]";
       }
     } else {
       info.name = "[Name Not Found]";
     }
 
-    // Get Vendor
     CFTypeRef vendorValue =
         CFDictionaryGetValue(properties, CFSTR("FireWire Vendor Name"));
     if (vendorValue != nullptr &&
@@ -73,9 +110,6 @@ FireWireDevice getDeviceInfo(io_service_t device) {
                              kCFStringEncodingUTF8)) {
         info.vendor = vendorBuffer;
       } else {
-        std::cerr << "Warning [IO]: Failed to get C string for FireWire Vendor "
-                     "Name (GUID: 0x"
-                  << std::hex << info.guid << std::dec << ")." << std::endl;
         info.vendor = "[Unknown Vendor]";
       }
     } else {
@@ -83,11 +117,6 @@ FireWireDevice getDeviceInfo(io_service_t device) {
     }
 
     CFRelease(properties);
-  } else {
-    std::cerr
-        << "Warning [IO]: Failed to get device properties for service object: "
-        << device << " (IOReturn: " << result << ")" << std::endl;
-    // Keep initialized error values for name/vendor/guid
   }
 
   return info;
@@ -95,54 +124,39 @@ FireWireDevice getDeviceInfo(io_service_t device) {
 
 IOReturn safeReadQuadlet(IOFireWireDeviceInterface **deviceInterface,
                          io_service_t service, uint64_t absoluteAddr,
-                         UInt32 &value, UInt32 generation) {
-  // Reset the segfault flag before attempting the read
+                         UInt32 &value, UInt32 generation, bool forceQuadlet) {
   g_segfaultOccurred = false;
 
-  // Save execution context for longjmp recovery
   if (setjmp(g_jmpBuf) == 0) {
-    // First time through - perform the read operation
-    // Guard against invalid interface pointer
     if (!deviceInterface || !*deviceInterface) {
-      std::cerr << "Error [safeReadQuadlet]: Invalid device interface.\n";
       return kIOReturnBadArgument;
     }
 
-    // Build the 64-bit FireWire address structure
     FWAddress addr;
     addr.addressHi = static_cast<UInt16>((absoluteAddr >> 32) & 0xFFFF);
     addr.addressLo = static_cast<UInt32>(absoluteAddr & 0xFFFFFFFF);
 
-    // Perform the quadlet read using the correct service handle
-    // Call the existing readQuadlet function which handles high/low addresses
-    // internally
-    IOReturn err = FWA::SCANNER::readQuadlet(deviceInterface, service,
-                                             absoluteAddr, value, generation);
+    IOReturn err =
+        FWA::SCANNER::readQuadlet(deviceInterface, service, absoluteAddr, value,
+                                  generation, forceQuadlet);
+
     return err;
-  } else {
-    // We get here if a segfault occurred and longjmp was called
-    std::cerr << "Recovered from segfault during read at address 0x" << std::hex
-              << absoluteAddr << std::dec << std::endl;
-    return kIOReturnError; // Return a generic error code
   }
+
+  return kIOReturnError;
 }
 
 IOReturn readQuadlet(IOFireWireDeviceInterface **deviceInterface,
                      io_service_t service, uint64_t absoluteAddr, UInt32 &value,
-                     UInt32 generation) {
-  // Guard against invalid interface pointer
+                     UInt32 generation, bool forceQuadlet) {
   if (!deviceInterface || !*deviceInterface) {
-    std::cerr << "Error [readQuadlet]: Invalid device interface.\n";
     return kIOReturnBadArgument;
   }
 
-  // If caller didn't provide generation, fetch it
   if (generation == 0) {
     IOReturn genErr =
         (*deviceInterface)->GetBusGeneration(deviceInterface, &generation);
     if (genErr != kIOReturnSuccess) {
-      std::cerr << "Error [readQuadlet]: Unable to get bus generation ("
-                << std::hex << genErr << ").\n";
       return genErr;
     }
   }
@@ -153,47 +167,235 @@ IOReturn readQuadlet(IOFireWireDeviceInterface **deviceInterface,
   addr.addressLo = static_cast<UInt32>(absoluteAddr & 0xFFFFFFFF);
 
   IOReturn err = kIOReturnSuccess;
-  const uint64_t HIGH_ADDRESS_THRESHOLD = 0xFFFFF0000000ULL;
 
-  if (absoluteAddr >= HIGH_ADDRESS_THRESHOLD) {
-    // Use Read for high addresses
-    UInt32 numBytesExpected = sizeof(UInt32); // Expected bytes for a quadlet
-    UInt32 numBytesToRead = numBytesExpected; // Request this many bytes, will
-                                              // be updated with actual read
-    // Use the 'Read' method from IOFireWireDeviceInterface
-    // Hypothesis: Signature is Read(..., service, addr*, buffer*, numBytes*,
-    // failOnReset, generation)
-    err = (*deviceInterface)
-              ->Read(deviceInterface, service, &addr, &value, &numBytesToRead,
-                     kFWFailOnReset, generation);
-    if (err != kIOReturnSuccess) {
-      std::cerr << "Error [readQuadlet/Read]: Read failed at 0x" << std::hex
-                << absoluteAddr << " (status: " << err << ").\n"
-                << std::dec;
+  std::string spaceInfo = identifyDiceSpace(absoluteAddr);
+  uint64_t relativeAddr = absoluteAddr & 0x0FFFFFFFULL;
+
+  // Enhanced logging for EAP space analysis
+  if (relativeAddr >= DICE_EAP_BASE &&
+      relativeAddr < (DICE_EAP_BASE + DICE_EAP_MAX_SIZE)) {
+    std::cerr << "Debug [EAP]: Accessing EAP space at 0x" << std::hex
+              << absoluteAddr << " (relative: 0x" << relativeAddr << ")"
+              << std::dec << std::endl;
+  }
+
+  // Determine read method and address transformation based on register space
+  bool useQuadlet = forceQuadlet;
+  uint64_t transformedAddr = absoluteAddr;
+  if (!useQuadlet) {
+    uint64_t relativeAddr = absoluteAddr & 0x0FFFFFFFULL;
+
+    // Transform subsystem and EAP addresses to match FireWire address space
+    // format
+    if (relativeAddr >= 0xC7000000) {
+      // Extract subsystem offset
+      uint64_t subsystemOffset = relativeAddr & 0x00FFFFFFULL;
+
+      // Map to standard FireWire address space
+      transformedAddr = 0xFFFFE0000000ULL | subsystemOffset;
+
+      std::cerr << "Debug [Transform]: Subsystem address transformation"
+                << std::endl
+                << "  Original:    0x" << std::hex << absoluteAddr << std::endl
+                << "  Relative:    0x" << relativeAddr << std::endl
+                << "  Offset:      0x" << subsystemOffset << std::endl
+                << "  Transformed: 0x" << transformedAddr << std::dec
+                << std::endl;
+
+      // Update address structure with transformed address
+      addr.addressHi = static_cast<UInt16>((transformedAddr >> 32) & 0xFFFF);
+      addr.addressLo = static_cast<UInt32>(transformedAddr & 0xFFFFFFFF);
+    } else if (relativeAddr >= DICE_EAP_BASE &&
+               relativeAddr < (DICE_EAP_BASE + DICE_EAP_MAX_SIZE)) {
+      // Extract EAP offset
+      uint64_t eapOffset = relativeAddr - DICE_EAP_BASE;
+
+      // Try similar transformation as subsystem addresses
+      uint64_t originalTransformedAddr = transformedAddr;
+      transformedAddr = 0xFFFFE0000000ULL | eapOffset;
+
+      std::cerr << "Debug [Transform]: Testing EAP address transformation"
+                << std::endl
+                << "  Original:    0x" << std::hex << absoluteAddr << std::endl
+                << "  Relative:    0x" << relativeAddr << std::endl
+                << "  EAP Offset:  0x" << eapOffset << std::endl
+                << "  Original TR: 0x" << originalTransformedAddr << std::endl
+                << "  Test TR:     0x" << transformedAddr << std::dec
+                << std::endl;
+
+      // Update address structure with transformed address
+      addr.addressHi = static_cast<UInt16>((transformedAddr >> 32) & 0xFFFF);
+      addr.addressLo = static_cast<UInt32>(transformedAddr & 0xFFFFFFFF);
     }
-    // Check if the actual bytes read (now in numBytesToRead) match requested
-    else if (numBytesToRead != numBytesExpected) {
-      // This shouldn't happen for a successful quadlet-sized read, but check
-      // anyway
-      std::cerr << "Warning [readQuadlet/Read]: Read at 0x" << std::hex
-                << absoluteAddr << " returned success but read " << std::dec
-                << numBytesToRead << " bytes instead of expected "
-                << numBytesExpected << ".\n";
-      // Consider returning an error or handling partial read if necessary
-      err =
-          kIOReturnUnderrun; // Treat partial read as an error for quadlet read
+    // Log potential EAP space transformations
+    else if (relativeAddr >= DICE_EAP_BASE &&
+             relativeAddr < (DICE_EAP_BASE + DICE_EAP_MAX_SIZE)) {
+      // Experimental: Try transforming EAP addresses similar to subsystem
+      // addresses
+      uint64_t eapOffset = relativeAddr - DICE_EAP_BASE;
+      uint64_t transformedEapAddr = 0xFFFFE0200000ULL | eapOffset;
+
+      std::cerr << "Debug [Transform]: EAP address analysis" << std::endl;
+      std::cerr << "  Original:    0x" << std::hex << absoluteAddr << std::endl;
+      std::cerr << "  Relative:    0x" << relativeAddr << std::endl;
+      std::cerr << "  EAP Offset:  0x" << eapOffset << std::endl;
+      std::cerr << "  Section:     0x" << (eapOffset & 0xFFF0);
+
+      // Identify EAP section
+      switch (eapOffset & 0xFFF0) {
+      case DICE_EAP_CAPABILITY_SPACE_OFF:
+        std::cerr << " (Capability)";
+        break;
+      case DICE_EAP_CMD_SPACE_OFF:
+        std::cerr << " (Command)";
+        break;
+      case DICE_EAP_MIXER_SPACE_OFF:
+        std::cerr << " (Mixer)";
+        break;
+      case DICE_EAP_PEAK_SPACE_OFF:
+        std::cerr << " (Peak)";
+        break;
+      case DICE_EAP_NEW_ROUTING_SPACE_OFF:
+        std::cerr << " (New Routing)";
+        break;
+      case DICE_EAP_NEW_STREAM_CFG_SPACE_OFF:
+        std::cerr << " (Stream Config)";
+        break;
+      case DICE_EAP_CURR_CFG_SPACE_OFF:
+        std::cerr << " (Current Config)";
+        break;
+      case DICE_EAP_STAND_ALONE_CFG_SPACE_OFF:
+        std::cerr << " (Standalone Config)";
+        break;
+      case DICE_EAP_APP_SPACE_OFF:
+        std::cerr << " (App)";
+        break;
+      default:
+        std::cerr << " (Unknown)";
+      }
+      std::cerr << std::dec << std::endl;
+
+      std::cerr << "  Sub-offset: 0x" << std::hex << (eapOffset & 0x000F)
+                << std::endl;
+      std::cerr << "  Transform:  0x" << transformedEapAddr << std::dec
+                << std::endl;
+
+      // Try the transformed address
+      transformedAddr = transformedEapAddr;
+      addr.addressHi = static_cast<UInt16>((transformedAddr >> 32) & 0xFFFF);
+      addr.addressLo = static_cast<UInt32>(transformedAddr & 0xFFFFFFFF);
     }
-    // If successful, 'value' already contains the data read. Endian swap might
-    // be needed later.
-  } else {
-    // Use ReadQuadlet for lower addresses
+
+    // Always use ReadQuadlet for standard spaces
+    if (relativeAddr < 0xC00) {
+      useQuadlet = true;
+    }
+    // Use Read for EAP space
+    else if (relativeAddr >= DICE_EAP_BASE &&
+             relativeAddr < (DICE_EAP_BASE + DICE_EAP_MAX_SIZE)) {
+      useQuadlet = false;
+    }
+    // Use Read for transformed subsystem addresses
+    else if (relativeAddr >= 0xC7000000) {
+      useQuadlet = false;
+    }
+    // Default to ReadQuadlet for unknown spaces
+    else {
+      useQuadlet = true;
+    }
+  }
+
+  if (useQuadlet) {
+    // Use ReadQuadlet
     err = (*deviceInterface)
               ->ReadQuadlet(deviceInterface, service, &addr, &value,
                             kFWFailOnReset, generation);
-    if (err != kIOReturnSuccess) {
-      std::cerr << "Error [readQuadlet/ReadQuadlet]: Read failed at 0x"
-                << std::hex << absoluteAddr << " (status: " << err << ").\n"
-                << std::dec;
+    // No logging for success
+  } else {
+    // Use Read for high addresses
+    UInt32 numBytesExpected = sizeof(UInt32);
+    UInt32 numBytesToRead = numBytesExpected;
+
+    err = (*deviceInterface)
+              ->Read(deviceInterface, service, &addr, &value, &numBytesToRead,
+                     kFWFailOnReset, generation);
+
+    // Enhanced EAP space access logging
+    if (relativeAddr >= DICE_EAP_BASE &&
+        relativeAddr < (DICE_EAP_BASE + DICE_EAP_MAX_SIZE)) {
+      // Calculate EAP-specific offsets and ranges
+      uint64_t eapOffset = relativeAddr - DICE_EAP_BASE;
+      uint64_t eapSection = eapOffset & 0xFFF0;
+      uint64_t eapSubOffset = eapOffset & 0x000F;
+
+      std::cerr << "Debug [EAP]: Access analysis" << std::endl;
+      std::cerr << "  Address:     0x" << std::hex << absoluteAddr << std::dec
+                << std::endl;
+      std::cerr << "  Base:        0x" << std::hex << DICE_EAP_BASE << std::dec
+                << std::endl;
+      std::cerr << "  Offset:      0x" << std::hex << eapOffset << std::dec
+                << std::endl;
+      std::cerr << "  Section:     0x" << std::hex << eapSection << std::dec;
+
+      // Identify EAP section
+      switch (eapSection) {
+      case DICE_EAP_CAPABILITY_SPACE_OFF:
+        std::cerr << " (Capability)";
+        break;
+      case DICE_EAP_CMD_SPACE_OFF:
+        std::cerr << " (Command)";
+        break;
+      case DICE_EAP_MIXER_SPACE_OFF:
+        std::cerr << " (Mixer)";
+        break;
+      case DICE_EAP_PEAK_SPACE_OFF:
+        std::cerr << " (Peak)";
+        break;
+      case DICE_EAP_NEW_ROUTING_SPACE_OFF:
+        std::cerr << " (New Routing)";
+        break;
+      case DICE_EAP_NEW_STREAM_CFG_SPACE_OFF:
+        std::cerr << " (Stream Config)";
+        break;
+      case DICE_EAP_CURR_CFG_SPACE_OFF:
+        std::cerr << " (Current Config)";
+        break;
+      case DICE_EAP_STAND_ALONE_CFG_SPACE_OFF:
+        std::cerr << " (Standalone Config)";
+        break;
+      case DICE_EAP_APP_SPACE_OFF:
+        std::cerr << " (App)";
+        break;
+      default:
+        std::cerr << " (Unknown)";
+      }
+      std::cerr << std::endl;
+      std::cerr << "  Sub-offset:  0x" << std::hex << eapSubOffset << std::dec
+                << std::endl;
+
+      // Log read results
+      if (err == kIOReturnSuccess) {
+        std::cerr << "  Result:      Success" << std::endl;
+        std::cerr << "  Value:       0x" << std::hex << value << std::dec
+                  << std::endl;
+        std::cerr << "  Bytes read:  " << numBytesToRead << "/"
+                  << numBytesExpected << std::endl;
+        // Try to interpret value as ASCII if it looks like text
+        std::string ascii = interpretAsASCII(value);
+        if (!ascii.empty()) {
+          std::cerr << "  ASCII:       \"" << ascii << "\"" << std::endl;
+        }
+      } else {
+        std::cerr << "  Result:      Failed (0x" << std::hex << err << std::dec
+                  << ")" << std::endl;
+        std::cerr << "  Bytes read:  " << numBytesToRead << "/"
+                  << numBytesExpected << std::endl;
+      }
+      std::cerr << std::endl;
+    }
+
+    if (err == kIOReturnSuccess && numBytesToRead != numBytesExpected) {
+      err = kIOReturnUnderrun;
     }
   }
 
