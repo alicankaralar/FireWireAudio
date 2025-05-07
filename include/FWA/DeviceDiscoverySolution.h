@@ -12,7 +12,8 @@
  * as generic FireWire devices without the AVC unit interface.
  */
 
-#include "FWA/DiceDefines.hpp" // Include DICE register definitions
+#include "FWA/DiceAbsoluteAddresses.hpp" // Include DICE absolute addresses
+#include "FWA/DiceDefines.hpp"           // Include DICE enums, bitmasks, etc.
 #include <IOKit/IOKitLib.h>
 #include <IOKit/firewire/IOFireWireLib.h> // Added include for FireWire types
 #include <string>                         // For std::string in error messages
@@ -64,9 +65,15 @@ inline bool IsDiceDevice(IOFireWireDeviceInterface **deviceInterface,
 
   // Use DICE register definitions from DiceDefines.hpp directly
   std::vector<uint64_t> testRegisters = {
-      DICE_REGISTER_BASE + DICE_REGISTER_GLOBAL_PAR_SPACE_OFF,
-      DICE_REGISTER_BASE + DICE_REGISTER_GLOBAL_PAR_SPACE_SZ,
-      DICE_REGISTER_BASE + DICE_REGISTER_TX_PAR_SPACE_OFF};
+      // Use absolute addresses directly from DiceAbsoluteAddresses.hpp
+      GLOBAL_OWNER_ADDR,        // Offset 0x00 relative to base
+      GLOBAL_NOTIFICATION_ADDR, // Offset 0x08 relative to base
+      GLOBAL_CLOCK_SELECT_ADDR  // Offset 0x4C relative to base
+      // Note: Using absolute addresses directly is simpler than recalculating
+      // offsets
+      // from potentially conflicting base definitions. We test a few key global
+      // registers.
+  };
 
   // Get the current generation
   UInt32 generation;

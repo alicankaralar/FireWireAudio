@@ -3,8 +3,32 @@
 
 #include <cstdint>
 
+#include <set> // Added for std::set
+
 namespace FWA {
 namespace DICE {
+
+// Structure to identify a device by Vendor and Model ID
+struct DeviceIdentifier {
+  uint32_t vendorId;
+  uint32_t modelId;
+
+  // Comparison operators for use in std::set
+  bool operator<(const DeviceIdentifier &other) const {
+    if (vendorId != other.vendorId)
+      return vendorId < other.vendorId;
+    return modelId < other.modelId;
+  }
+  bool operator==(const DeviceIdentifier &other) const {
+    return vendorId == other.vendorId && modelId == other.modelId;
+  }
+};
+
+// Set of devices known *not* to support EAP
+const std::set<DeviceIdentifier> EAP_UNSUPPORTED_DEVICES = {
+    {0x10c73f, 0x00000001} // Midas Venice F32 (Based on FFADO log analysis)
+                           // Add other devices here as discovered
+};
 
 // DICE version definition
 #define DICE_VER_1_0_7_0
@@ -18,7 +42,7 @@ namespace DICE {
 
 // Register addresses & offsets
 //  DICE_PRIVATE_SPACE registers
-#define DICE_REGISTER_BASE 0x0000FFFFE0000000ULL // Corrected base address
+#define DICE_REGISTER_BASE 0x0000FFFFE0000000ULL
 
 // Default absolute base addresses for TX and RX blocks (used as fallback)
 #define DICE_REGISTER_TX_BASE (DICE_REGISTER_BASE + 0x400ULL)
@@ -186,7 +210,7 @@ namespace DICE {
 #define DICE_NOTIFY_CLOCK_ACCEPTED (1UL << 5)
 #define DICE_INTERFACE_CHG_BIT (1UL << 6)
 
-// User notifications
+// User notifications (Defined in )
 #define DICE_NOTIFY_RESERVED1 (1UL << 16)
 #define DICE_NOTIFY_RESERVED2 (1UL << 17)
 #define DICE_NOTIFY_RESERVED3 (1UL << 18)
@@ -210,7 +234,7 @@ namespace DICE {
 
 //   NICK_NAME register
 // NOTE: in bytes
-#define DICE_NICK_NAME_SIZE 64
+#define DICE_NICK_NAME_SIZE 64 // Defined in
 
 //   CLOCK_SELECT register
 // Clock sources supported
@@ -303,7 +327,7 @@ namespace DICE {
 #define DICE_DRIVER_SPEC_VERSION_NUMBER_GET_D(x)                               \
   DICE_DRIVER_SPEC_VERSION_NUMBER_GET(x, 0)
 
-//   CLOCKCAPABILITIES register
+//   CLOCKCAPABILITIES register ()
 #define DICE_CLOCKCAP_RATE_32K (1UL << 0)
 #define DICE_CLOCKCAP_RATE_44K1 (1UL << 1)
 #define DICE_CLOCKCAP_RATE_48K (1UL << 2)
@@ -338,9 +362,12 @@ namespace DICE {
 #define DICE_RX_NAMES_SIZE 256
 
 // EAP (Extended Application Protocol) Definitions
+// EAP (Extended Application Protocol) Base and Transformation
 #define DICE_EAP_BASE 0x0000000000200000ULL
 #define DICE_EAP_MAX_SIZE 0x0000000000F00000ULL
+#define DICE_EAP_TRANSFORM_BASE 0xFFFFE0200000ULL
 
+// EAP Section Definitions
 #define DICE_EAP_CAPABILITY_SPACE_OFF 0x0000
 #define DICE_EAP_CAPABILITY_SPACE_SZ 0x0004
 #define DICE_EAP_CMD_SPACE_OFF 0x0008
@@ -360,6 +387,45 @@ namespace DICE {
 #define DICE_EAP_APP_SPACE_OFF 0x0040
 #define DICE_EAP_APP_SPACE_SZ 0x0044
 #define DICE_EAP_ZERO_MARKER_1 0x0048
+
+// EAP Section Identifiers
+enum class EAPSection {
+  Capability = 0,
+  Command = 1,
+  Mixer = 2,
+  Peak = 3,
+  NewRouting = 4,
+  NewStreamConfig = 5,
+  CurrentConfig = 6,
+  StandaloneConfig = 7,
+  Application = 8,
+  Unknown = 0xFF
+};
+
+// EAP Section Info Structure
+struct EAPSectionInfo {
+  uint32_t offset;
+  uint32_t size;
+  const char *name;
+  bool isReadOnly;
+};
+
+// EAP Section Mapping
+static const EAPSectionInfo EAP_SECTION_MAP[] = {
+    {DICE_EAP_CAPABILITY_SPACE_OFF, DICE_EAP_CAPABILITY_SPACE_SZ, "Capability",
+     true},
+    {DICE_EAP_CMD_SPACE_OFF, DICE_EAP_CMD_SPACE_SZ, "Command", false},
+    {DICE_EAP_MIXER_SPACE_OFF, DICE_EAP_MIXER_SPACE_SZ, "Mixer", false},
+    {DICE_EAP_PEAK_SPACE_OFF, DICE_EAP_PEAK_SPACE_SZ, "Peak", true},
+    {DICE_EAP_NEW_ROUTING_SPACE_OFF, DICE_EAP_NEW_ROUTING_SPACE_SZ,
+     "NewRouting", false},
+    {DICE_EAP_NEW_STREAM_CFG_SPACE_OFF, DICE_EAP_NEW_STREAM_CFG_SPACE_SZ,
+     "NewStreamConfig", false},
+    {DICE_EAP_CURR_CFG_SPACE_OFF, DICE_EAP_CURR_CFG_SPACE_SZ, "CurrentConfig",
+     true},
+    {DICE_EAP_STAND_ALONE_CFG_SPACE_OFF, DICE_EAP_STAND_ALONE_CFG_SPACE_SZ,
+     "StandaloneConfig", false},
+    {DICE_EAP_APP_SPACE_OFF, DICE_EAP_APP_SPACE_SZ, "Application", false}};
 
 // CAPABILITY registers
 #define DICE_EAP_CAPABILITY_ROUTER 0x0000
@@ -387,7 +453,7 @@ namespace DICE {
 #define DICE_EAP_CAP_GENERAL_MAX_TX_STREAM 4
 #define DICE_EAP_CAP_GENERAL_MAX_RX_STREAM 8
 #define DICE_EAP_CAP_GENERAL_STRM_CFG_FLS 12
-#define DICE_EAP_CAP_GENERAL_CHIP 16
+// #define DICE_EAP_CAP_GENERAL_CHIP 16
 
 #define DICE_EAP_CAP_GENERAL_CHIP_DICEII 0
 #define DICE_EAP_CAP_GENERAL_CHIP_DICEMINI 1

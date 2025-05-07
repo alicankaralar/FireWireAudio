@@ -1,6 +1,7 @@
 // src/FWA/DiceAudioDevice.cpp
 #include "FWA/DiceAudioDevice.h"
 #include "FWA/DeviceController.h"
+#include "FWA/DiceAbsoluteAddresses.hpp"
 #include "FWA/DiceDefines.hpp"
 #include "FWA/DiceEAP.hpp"
 #include "FWA/DiceRouter.hpp"
@@ -114,20 +115,29 @@ std::expected<void, IOKitError> DiceAudioDevice::init() {
     eap_ = std::make_unique<DiceEAP>(*this);
     auto eapInit = eap_->init();
     if (!eapInit) {
-      spdlog::warn("Could not initialize EAP interface: {}",
-                   static_cast<int>(eapInit.error()));
+      spdlog::warn(
+          "Could not initialize EAP interface: {}. EAP will be disabled.",
+          static_cast<int>(eapInit.error()));
       eap_.reset();
+      m_supportsEAP = false;
     } else {
       spdlog::info("EAP interface initialized successfully");
+      m_supportsEAP = true;
 
       // Initialize the router if EAP was successful
       router_ = std::make_unique<DiceRouter>(*eap_);
       spdlog::info("Router interface initialized");
     }
   } else {
-    spdlog::debug("This device does not support EAP");
+    m_supportsEAP = false;
   }
-
+  if (!m_supportsEAP) {
+    spdlog::info("EAP support is disabled for this device.");
+    if (eap_)
+      eap_.reset();
+    if (router_)
+      router_.reset();
+  }
   return {};
 }
 
@@ -369,8 +379,9 @@ std::expected<void, IOKitError> DiceAudioDevice::setSampleRate(int sampleRate) {
   uint32_t statusReg = statusRegResult.value();
 
   int attempts = 0;
-  while (((statusReg & 0x1) == 0 ||
-          ((clockReg >> 8) & 0xFF) != ((statusReg >> 8) & 0xFF)) &&
+  // Use bitmask from DiceAbsoluteAddresses.hpp and constexpr function
+  while (((statusReg & DICE_STATUS_SOURCE_LOCKED) == 0 ||
+          DICE_GET_RATE(clockReg) != DICE_STATUS_GET_NOMINAL_RATE(statusReg)) &&
          attempts < 20) {
     usleep(100000); // 100ms
     statusRegResult = readGlobalReg(DICE_REGISTER_GLOBAL_STATUS);
@@ -398,7 +409,6 @@ std::expected<void, IOKitError> DiceAudioDevice::setSampleRate(int sampleRate) {
   return {};
 }
 
-// Removed const from definition AGAIN and removed incorrect switch block
 std::expected<std::vector<int>, IOKitError>
 DiceAudioDevice::getSupportedSampleRates() {
   std::vector<int> rates;
@@ -474,7 +484,7 @@ std::expected<std::string, IOKitError> DiceAudioDevice::getNickname() {
   char nameString[DICE_NICK_NAME_SIZE + 1];
   std::memcpy(nameString, nameData.data(), DICE_NICK_NAME_SIZE);
 
-// Strings from the device are always little-endian
+  // Strings from the device are always little-endian
 #if __BYTE_ORDER == __BIG_ENDIAN
   // Swap bytes for big-endian systems
   for (size_t i = 0; i < DICE_NICK_NAME_SIZE / 4; i++) {
@@ -500,7 +510,7 @@ DiceAudioDevice::setNickname(const std::string &name) {
   std::strncpy(reinterpret_cast<char *>(nameData.data()), name.c_str(),
                DICE_NICK_NAME_SIZE - 1);
 
-// Strings to the device must be little-endian
+  // Strings to the device must be little-endian
 #if __BYTE_ORDER == __BIG_ENDIAN
   // Swap bytes for big-endian systems
   for (size_t i = 0; i < nameData.size(); i++) {
@@ -1076,8 +1086,7 @@ std::expected<void, IOKitError> DiceAudioDevice::lock() {
   }
 
   // Register ourselves as the device owner
-  uint64_t ownerRegAddr =
-      DICE_REGISTER_BASE + m_global_reg_offset + DICE_REGISTER_GLOBAL_OWNER;
+  uint64_t ownerRegAddr = GLOBAL_OWNER_ADDR;
 
   // We need to read the current owner value (we can read only 32 bits at a
   // time)
@@ -1157,8 +1166,7 @@ std::expected<void, IOKitError> DiceAudioDevice::unlock() {
   }
 
   // Unregister ourselves as device owner
-  uint64_t ownerRegAddr =
-      DICE_REGISTER_BASE + m_global_reg_offset + DICE_REGISTER_GLOBAL_OWNER;
+  uint64_t ownerRegAddr = GLOBAL_OWNER_ADDR;
 
   // Write the "no owner" value to release ownership (64-bit value)
   uint64_t noOwnerValue = DICE_OWNER_NO_OWNER;
@@ -1383,6 +1391,176 @@ std::string IOKitErrorToString(IOKitError error) {
   default:
     return "Unknown error: " + std::to_string(static_cast<int>(error));
   }
+}
+
+// EAP section-aware access methods
+std::expected<uint32_t, IOKitError>
+DiceAudioDevice::readEAPReg(DICE::EAPSection section, uint32_t offset) {
+  spdlog::debug("Reading EAP register - Section: {}, Offset: 0x{:x}",
+                getEAPSectionInfo(section)->name, offset);
+
+  uint64_t addr = eapOffsetGen(section, offset, 4);
+  if (addr == DICE_INVALID_OFFSET) {
+    spdlog::error(
+        "Invalid EAP address generated for section {} at offset 0x{:x}",
+        getEAPSectionInfo(section)->name, offset);
+    return std::unexpected(IOKitError::BadArgument);
+  }
+
+  // Apply EAP address transformation
+  addr = (addr & 0xFFFFFFFFFULL) | DICE_EAP_TRANSFORM_BASE;
+
+  auto result = readReg(addr);
+  if (!result) {
+    spdlog::error(
+        "Failed to read EAP register - Section: {}, Offset: 0x{:x}, Error: {}",
+        getEAPSectionInfo(section)->name, offset,
+        static_cast<int>(result.error()));
+  } else {
+    spdlog::debug("Successfully read EAP register - Section: {}, Offset: "
+                  "0x{:x}, Value: 0x{:08x}",
+                  getEAPSectionInfo(section)->name, offset, result.value());
+  }
+  return result;
+}
+
+std::expected<void, IOKitError>
+DiceAudioDevice::writeEAPReg(DICE::EAPSection section, uint32_t offset,
+                             uint32_t data) {
+  if (isEAPSectionReadOnly(section)) {
+    spdlog::error("Attempted to write to read-only EAP section: {}",
+                  getEAPSectionInfo(section)->name);
+    return std::unexpected(IOKitError::NotWritable);
+  }
+
+  spdlog::debug(
+      "Writing EAP register - Section: {}, Offset: 0x{:x}, Data: 0x{:08x}",
+      getEAPSectionInfo(section)->name, offset, data);
+
+  uint64_t addr = eapOffsetGen(section, offset, 4);
+  if (addr == DICE_INVALID_OFFSET) {
+    spdlog::error(
+        "Invalid EAP address generated for section {} at offset 0x{:x}",
+        getEAPSectionInfo(section)->name, offset);
+    return std::unexpected(IOKitError::BadArgument);
+  }
+
+  // Apply EAP address transformation
+  addr = (addr & 0xFFFFFFFFFULL) | DICE_EAP_TRANSFORM_BASE;
+
+  auto result = writeReg(addr, data);
+  if (!result) {
+    spdlog::error(
+        "Failed to write EAP register - Section: {}, Offset: 0x{:x}, Error: {}",
+        getEAPSectionInfo(section)->name, offset,
+        static_cast<int>(result.error()));
+  } else {
+    spdlog::debug(
+        "Successfully wrote EAP register - Section: {}, Offset: 0x{:x}",
+        getEAPSectionInfo(section)->name, offset);
+  }
+  return result;
+}
+
+std::expected<std::vector<uint32_t>, IOKitError>
+DiceAudioDevice::readEAPBlock(DICE::EAPSection section, uint32_t offset,
+                              size_t length) {
+  spdlog::debug("Reading EAP block - Section: {}, Offset: 0x{:x}, Length: {}",
+                getEAPSectionInfo(section)->name, offset, length);
+
+  uint64_t addr = eapOffsetGen(section, offset, length);
+  if (addr == DICE_INVALID_OFFSET) {
+    spdlog::error(
+        "Invalid EAP address generated for section {} at offset 0x{:x}",
+        getEAPSectionInfo(section)->name, offset);
+    return std::unexpected(IOKitError::BadArgument);
+  }
+
+  // Apply EAP address transformation
+  addr = (addr & 0xFFFFFFFFFULL) | DICE_EAP_TRANSFORM_BASE;
+
+  auto result = readRegBlock(addr, length);
+  if (!result) {
+    spdlog::error(
+        "Failed to read EAP block - Section: {}, Offset: 0x{:x}, Error: {}",
+        getEAPSectionInfo(section)->name, offset,
+        static_cast<int>(result.error()));
+  } else {
+    spdlog::debug(
+        "Successfully read EAP block - Section: {}, Offset: 0x{:x}, Size: {}",
+        getEAPSectionInfo(section)->name, offset, result.value().size());
+  }
+  return result;
+}
+
+std::expected<void, IOKitError>
+DiceAudioDevice::writeEAPBlock(DICE::EAPSection section, uint32_t offset,
+                               const uint32_t *data, size_t length) {
+  if (isEAPSectionReadOnly(section)) {
+    spdlog::error("Attempted to write to read-only EAP section: {}",
+                  getEAPSectionInfo(section)->name);
+    return std::unexpected(IOKitError::NotWritable);
+  }
+
+  spdlog::debug("Writing EAP block - Section: {}, Offset: 0x{:x}, Length: {}",
+                getEAPSectionInfo(section)->name, offset, length);
+
+  uint64_t addr = eapOffsetGen(section, offset, length);
+  if (addr == DICE_INVALID_OFFSET) {
+    spdlog::error(
+        "Invalid EAP address generated for section {} at offset 0x{:x}",
+        getEAPSectionInfo(section)->name, offset);
+    return std::unexpected(IOKitError::BadArgument);
+  }
+
+  // Apply EAP address transformation
+  addr = (addr & 0xFFFFFFFFFULL) | DICE_EAP_TRANSFORM_BASE;
+
+  auto result = writeRegBlock(addr, data, length);
+  if (!result) {
+    spdlog::error(
+        "Failed to write EAP block - Section: {}, Offset: 0x{:x}, Error: {}",
+        getEAPSectionInfo(section)->name, offset,
+        static_cast<int>(result.error()));
+  } else {
+    spdlog::debug("Successfully wrote EAP block - Section: {}, Offset: 0x{:x}",
+                  getEAPSectionInfo(section)->name, offset);
+  }
+  return result;
+}
+
+// EAP helper methods
+uint64_t DiceAudioDevice::eapOffsetGen(DICE::EAPSection section,
+                                       uint32_t offset, size_t length) {
+  const DICE::EAPSectionInfo *sectionInfo = getEAPSectionInfo(section);
+  if (!sectionInfo) {
+    spdlog::error("Invalid EAP section");
+    return DICE_INVALID_OFFSET;
+  }
+
+  // Check if offset+length exceeds section size
+  if (offset + length > sectionInfo->size) {
+    spdlog::error("EAP access exceeds section bounds - Section: {}, Offset: "
+                  "0x{:x}, Length: {}, Size: 0x{:x}",
+                  sectionInfo->name, offset, length, sectionInfo->size);
+    return DICE_INVALID_OFFSET;
+  }
+
+  return DICE_EAP_BASE + sectionInfo->offset + offset;
+}
+
+const DICE::EAPSectionInfo *
+DiceAudioDevice::getEAPSectionInfo(DICE::EAPSection section) const {
+  if (static_cast<size_t>(section) >= std::size(DICE::EAP_SECTION_MAP)) {
+    spdlog::error("Invalid EAP section index: {}", static_cast<int>(section));
+    return nullptr;
+  }
+  return &DICE::EAP_SECTION_MAP[static_cast<size_t>(section)];
+}
+
+bool DiceAudioDevice::isEAPSectionReadOnly(DICE::EAPSection section) const {
+  const DICE::EAPSectionInfo *sectionInfo = getEAPSectionInfo(section);
+  return sectionInfo ? sectionInfo->isReadOnly : true;
 }
 
 } // namespace FWA
