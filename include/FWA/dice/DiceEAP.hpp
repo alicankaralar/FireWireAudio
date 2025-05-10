@@ -1,9 +1,9 @@
-// include/FWA/DiceEAP.hpp
+// include/FWA/dice/DiceEAP.hpp
 #pragma once
 
-#include "FWA/DiceAbsoluteAddresses.hpp" // Add for constexpr and enums
-#include "FWA/DiceDefines.hpp" // Keep for non-conflicting defines/enums if any
 #include "FWA/Error.h"
+#include "FWA/dice/DiceAbsoluteAddresses.hpp" // Add for constexpr and enums
+#include "FWA/dice/DiceDefines.hpp" // Keep for non-conflicting defines/enums if any
 #include <cstdint>
 #include <expected>
 #include <map>

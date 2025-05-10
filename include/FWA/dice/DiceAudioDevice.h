@@ -1,9 +1,9 @@
-// include/FWA/DiceAudioDevice.h
+// include/FWA/dice/DiceAudioDevice.h
 #pragma once
 
 #include "FWA/AudioDevice.h"
-#include "FWA/DiceDefines.hpp" // Include necessary DICE definitions
 #include "FWA/Error.h"
+#include "FWA/dice/DiceDefines.hpp" // Include necessary DICE definitions
 #include <cstdint>
 #include <expected>
 #include <memory>
