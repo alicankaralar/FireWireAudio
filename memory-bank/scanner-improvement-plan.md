@@ -501,7 +501,7 @@ void validateStreamChannels(FireWireDevice &device, uint64_t discoveredDiceBase,
                            IOFireWireDeviceInterface **deviceInterface, io_service_t service, UInt32 generation)
 {
     // Find TX Parameter Space Offset
-    uint64_t txParamSpaceOffsetAddr = discoveredDiceBase + DICE_REGISTER_TX_PAR_SPACE_OFF;
+    uint64_t txParamSpaceOffsetAddr = discoveredDiceBase + DICE_REGISTER_TX_PARAMETER_SPACE_OFFSET;
     uint32_t txParamSpaceOffsetQuadlets = 0;
     if (device.diceRegisters.count(txParamSpaceOffsetAddr))
     {
@@ -518,7 +518,7 @@ void validateStreamChannels(FireWireDevice &device, uint64_t discoveredDiceBase,
     for (unsigned int i = 0; i < device.txStreamCount; ++i)
     {
         uint64_t streamInstanceOffsetBytes = i * device.txStreamSizeQuadlets * 4;
-        uint64_t nbAudioAddr = txParamSpaceBase + streamInstanceOffsetBytes + DICE_REGISTER_TX_NB_AUDIO_BASE;
+        uint64_t nbAudioAddr = txParamSpaceBase + streamInstanceOffsetBytes + DICE_REGISTER_TX_NUMBER_AUDIO_BASE_OFFSET;
         
         UInt32 nbAudio = 0;
         IOReturn status = safeReadQuadlet(deviceInterface, service, nbAudioAddr, nbAudio, generation);
@@ -591,15 +591,15 @@ void crossValidateChannelCounts(FireWireDevice &device, int totalMonoOutputs, in
         uint64_t baseAddr = DICE_REGISTER_BASE;
         int64_t offset = addr - baseAddr;
         
-        // Check if this is a TX_NB_AUDIO register
-        if ((offset - DICE_REGISTER_TX_NB_AUDIO_BASE) % (device.txStreamSizeQuadlets * 4) == 0)
+        // Check if this is a TX_NUMBER_AUDIO register
+        if ((offset - DICE_REGISTER_TX_NUMBER_AUDIO_BASE_OFFSET) % (device.txStreamSizeQuadlets * 4) == 0)
         {
             uint32_t channelCount = CFSwapInt32LittleToHost(regPair.second);
             totalStreamOutputChannels += channelCount;
         }
         
-        // Check if this is a RX_NB_AUDIO register
-        if ((offset - DICE_REGISTER_RX_NB_AUDIO_BASE) % (device.rxStreamSizeQuadlets * 4) == 0)
+        // Check if this is a RX_NUMBER_AUDIO register
+        if ((offset - DICE_REGISTER_RX_NUMBER_AUDIO_BASE_OFFSET) % (device.rxStreamSizeQuadlets * 4) == 0)
         {
             uint32_t channelCount = CFSwapInt32LittleToHost(regPair.second);
             totalStreamInputChannels += channelCount;

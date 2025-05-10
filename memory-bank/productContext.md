@@ -121,14 +121,14 @@ Analysis of the FFADO library source code provides another perspective on DICE i
 
 *   **Architecture:** FFADO is a C++ userspace library using `libraw1394` for direct FireWire communication (quadlet reads/writes, isochronous stream management, ARM notifications).
 *   **Register Access:**
-    *   FFADO dynamically determines the base addresses for the Global, Tx, and Rx register spaces by reading specific registers (`DICE_REGISTER_GLOBAL_PAR_SPACE_OFF`, etc.) relative to a base pointer (`DICE_REGISTER_BASE = 0x0000FFFFE0000000ULL`).
+    *   FFADO dynamically determines the base addresses for the Global, Tx, and Rx register spaces by reading specific registers (`DICE_REGISTER_GLOBAL_PARAMETER_SPACE_OFFSET`, etc.) relative to a base pointer (`DICE_REGISTER_BASE = 0x0000FFFFE0000000ULL`).
     *   It then uses relative offsets defined in `dice_defines.h` to access registers *within* these dynamically located spaces.
 *   **Register Offset Discrepancies (Spec vs. FFADO):** This dynamic base + relative offset approach leads to different effective offsets compared to the absolute offsets defined in the DICE specification PDF (relative to `0xFFFFF0000000`). Key examples:
     *   **GLOBAL_OWNER:** Spec: `0x04` | FFADO: `0x00` (relative to dynamic Global base)
     *   **GLOBAL_NOTIFICATION:** Spec: `0x88` (Owner space) | FFADO: `0x08` (relative to dynamic Global base)
     *   **GLOBAL_CLOCK_SELECT:** Spec: `0x20` | FFADO: `0x4C` (relative to dynamic Global base)
-    *   **TX_ISOC_CHANNEL (Base):** Spec: `0x10C` | FFADO: `0x08` (relative to dynamic Tx base)
-    *   **RX_ISOC_CHANNEL (Base):** Spec: `0x20C` | FFADO: `0x08` (relative to dynamic Rx base)
+    *   **TX_ISOCHRONOUS_CHANNEL (Base):** Spec: `0x10C` | FFADO: `0x08` (relative to dynamic Tx base)
+    *   **RX_ISOCHRONOUS_CHANNEL (Base):** Spec: `0x20C` | FFADO: `0x08` (relative to dynamic Rx base)
     *   **Note:** This difference is crucial and suggests relying solely on the specification's absolute offsets might be incorrect if the device expects interaction relative to dynamically discovered bases, as implemented in FFADO.
 *   **Notifications:** Uses ARM handlers registered via `libraw1394`. The host provides a notification address via `GLOBAL_OWNER`, and the device writes notification codes there.
 *   **Streaming:** Uses `AmdtpReceiveStreamProcessor` / `AmdtpTransmitStreamProcessor` (IEC 61883-6 AM824). Configures streams by writing the allocated ISO channel number to DICE Tx/Rx registers.
