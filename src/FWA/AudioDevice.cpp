@@ -12,27 +12,30 @@
 
 namespace FWA {
 
-AudioDevice::AudioDevice(std::uint64_t guid, const std::string &deviceName,
-                         const std::string &vendorName,
-                         io_service_t fwDeviceService, // Changed parameter name
-                         DeviceController *deviceController)
-    : guid_(guid), deviceName_(deviceName), vendorName_(vendorName),
-      // avcUnit_(avcUnit), // Removed - Initialized below
-      deviceController_(deviceController),
-      // fwUnit_(0), // Removed - no longer needed
-      fwDevice_(fwDeviceService), // Initialize fwDevice_ directly
-      busController_(0), notificationPort_(nullptr), interestNotification_(0),
-      deviceInterface(nullptr), avcInterface_(nullptr),
-      avcUnit_(0) // Initialize re-added member
-{
-  spdlog::info("AudioDevice::AudioDevice - Creating device with GUID: 0x{:x}",
-               guid);
+    AudioDevice::AudioDevice(std::uint64_t guid, const std::string &deviceName,
+                             const std::string &vendorName,
+                             io_service_t fwDeviceService, // Changed parameter name
+                             DeviceController *deviceController)
+        : guid_(guid), deviceName_(deviceName), vendorName_(vendorName),
+          // avcUnit_(avcUnit), // Removed - Initialized below
+          deviceController_(deviceController),
+          // fwUnit_(0), // Removed - no longer needed
+          fwDevice_(fwDeviceService), // Initialize fwDevice_ directly
+          busController_(0), notificationPort_(nullptr), interestNotification_(0),
+          deviceInterface(nullptr), avcInterface_(nullptr),
+          avcUnit_(0),              // Initialize re-added member
+          hasAvcCapability_(false), // Initialize AVC capability flag
+          hasDICESupport_(false)    // Initialize DICE support flag
+    {
+        spdlog::info("AudioDevice::AudioDevice - Creating device with GUID: 0x{:x}",
+                     guid);
 
-  if (fwDevice_) { // Retain the passed fwDeviceService
-    IOObjectRetain(fwDevice_);
-  }
-  // Do NOT call shared_from_this() here!
-}
+        if (fwDevice_)
+        { // Retain the passed fwDeviceService
+            IOObjectRetain(fwDevice_);
+        }
+        // Do NOT call shared_from_this() here!
+    }
 
 AudioDevice::~AudioDevice() {
   if (interestNotification_) {
@@ -60,16 +63,6 @@ AudioDevice::~AudioDevice() {
     fwDevice_ = 0;
   }
 
-  /* REMOVED
-  if (fwUnit_) {
-      IOObjectRelease(fwUnit_);
-      fwUnit_ = 0;
-  }
-  if (avcUnit_) {
-      IOObjectRelease(avcUnit_);
-      avcUnit_ = 0;
-  }
-  */
   spdlog::debug("AudioDevice::~AudioDevice - Destroyed device GUID: 0x{:x}",
                 guid_);
 }
@@ -81,37 +74,16 @@ std::expected<void, IOKitError> AudioDevice::init() {
                   "fwDevice service.");
     return std::unexpected(IOKitError(kIOReturnNotAttached));
   }
-  /* REMOVED - Start directly from fwDevice_
-  IOReturn result = IORegistryEntryGetParentEntry(avcUnit_, kIOServicePlane,
-  &fwUnit_); if (result != kIOReturnSuccess || !fwUnit_) {
-      spdlog::error("AudioDevice::init: Failed to get fwUnit: 0x{:x}", result);
-      return std::unexpected(static_cast<IOKitError>(result != kIOReturnSuccess
-  ? result : kIOReturnNotFound));
-  }
-  spdlog::debug("AudioDevice::init: Got fwUnit_ service: {:#x}", fwUnit_);
-
-  result = IORegistryEntryGetParentEntry(fwUnit_, kIOServicePlane, &fwDevice_);
-  if (result != kIOReturnSuccess || !fwDevice_) {
-      spdlog::error("AudioDevice::init: Failed to get fwDevice: 0x{:x}",
-  result); IOObjectRelease(fwUnit_); fwUnit_ = 0; return
-  std::unexpected(static_cast<IOKitError>(result != kIOReturnSuccess ? result :
-  kIOReturnNotFound));
-  }
-  spdlog::debug("AudioDevice::init: Got fwDevice_ service: {:#x}", fwDevice_);
-  */
 
   // Get bus controller directly from fwDevice_
   IOReturn result = IORegistryEntryGetParentEntry(fwDevice_, kIOServicePlane,
                                                   &busController_);
   if (result != kIOReturnSuccess || !busController_) {
-    spdlog::error(
-        "AudioDevice::init: Failed to get busController from fwDevice_: 0x{:x}",
-        result);
-    // IOObjectRelease(fwDevice_); fwDevice_ = 0; // Don't release fwDevice_
-    // here, it's owned by the class now IOObjectRelease(fwUnit_); fwUnit_ = 0;
-    // // Removed
-    return std::unexpected(static_cast<IOKitError>(
-        result != kIOReturnSuccess ? result : kIOReturnNotFound));
+      spdlog::error(
+          "AudioDevice::init: Failed to get busController from fwDevice_: 0x{:x}",
+          result);
+      return std::unexpected(static_cast<IOKitError>(
+          result != kIOReturnSuccess ? result : kIOReturnNotFound));
   }
   spdlog::debug("AudioDevice::init: Got busController_ service: {:#x}",
                 busController_);
@@ -128,6 +100,14 @@ std::expected<void, IOKitError> AudioDevice::init() {
                  vendorID_, modelID_, vendorName_);
   }
   // ---------------------------------------------------------
+
+  // Detect DICE support
+  detectDICESupport();
+
+  if (hasDICESupport_)
+  {
+      spdlog::info("AudioDevice::init: DICE device detected");
+  }
 
   // --- Attempt to find the associated AVC Unit service ---
   avcUnit_ = 0; // Ensure it's null initially
@@ -159,10 +139,17 @@ std::expected<void, IOKitError> AudioDevice::init() {
       avcUnit_ = fwDevice_;     // Use fwDevice_ itself as the AVC Unit
       IOObjectRetain(avcUnit_); // Retain it since we are assigning it
     } else {
-      spdlog::warn("AudioDevice::init: Could not find an associated "
-                   "IOFireWireAVCUnit service for fwDevice_: {:#x}",
-                   fwDevice_);
+        spdlog::info("AudioDevice::init: No AVC unit found for device. "
+                     "AVC functionality will be disabled, but basic FireWire "
+                     "functionality will still be available.");
+        // Continue without AVC - device may have basic FireWire capabilities
+        hasAvcCapability_ = false;
     }
+  }
+  else
+  {
+      // We found an AVC unit
+      hasAvcCapability_ = true;
   }
   // --- End AVC Unit search ---
 
@@ -196,42 +183,65 @@ std::expected<void, IOKitError> AudioDevice::init() {
   // 3. Now safely create the CommandInterface using shared_from_this().
   //    This will use the avcUnit_ found (or not found) above.
   try {
-    commandInterface_ = std::make_shared<CommandInterface>(shared_from_this());
-    spdlog::debug("AudioDevice::init: CommandInterface created.");
-    auto activationResult = commandInterface_->activate();
-    if (!activationResult &&
-        activationResult.error() != IOKitError::StillOpen) {
-      spdlog::error("AudioDevice::init: Failed to activate CommandInterface "
-                    "before parsing: 0x{:x}",
-                    static_cast<int>(activationResult.error()));
-      commandInterface_.reset();
-      return std::unexpected(activationResult.error());
-    }
-    spdlog::debug("AudioDevice::init: CommandInterface activated (or was "
-                  "already active).");
+      if (hasAvcCapability_)
+      {
+          commandInterface_ = std::make_shared<CommandInterface>(shared_from_this());
+          spdlog::debug("AudioDevice::init: CommandInterface created.");
+          auto activationResult = commandInterface_->activate();
+          if (!activationResult &&
+              activationResult.error() != IOKitError::StillOpen)
+          {
+              spdlog::error("AudioDevice::init: Failed to activate CommandInterface "
+                            "before parsing: 0x{:x}",
+                            static_cast<int>(activationResult.error()));
+              commandInterface_.reset();
+              // Non-fatal error - continue with limited functionality
+              spdlog::warn("AudioDevice::init: Continuing with limited AVC functionality.");
+          }
+          else
+          {
+              spdlog::debug("AudioDevice::init: CommandInterface activated (or was "
+                            "already active).");
+          }
+      }
+      else
+      {
+          spdlog::info("AudioDevice::init: Skipping CommandInterface creation for non-AVC device.");
+      }
   } catch (const std::bad_weak_ptr &e) {
     spdlog::critical("AudioDevice::init: Failed to create CommandInterface. "
                      "Was AudioDevice created using "
                      "std::make_shared? Exception: "
                      "{}",
                      e.what());
-    if (deviceInterface) {
-      (*deviceInterface)->Release(deviceInterface);
-      deviceInterface = nullptr;
-    }
-    return std::unexpected(IOKitError(kIOReturnInternalError));
+    // Non-fatal error - we'll continue without AVC functionality
+    hasAvcCapability_ = false;
+    spdlog::warn("AudioDevice::init: Continuing without AVC functionality due to error.");
   }
 
   // 4. Discover device capabilities using DeviceParser.
   spdlog::info("AudioDevice::init: Starting device capability discovery...");
-  auto parser = std::make_shared<DeviceParser>(this);
-  auto parseResult = parser->parse();
-  if (!parseResult) {
-    spdlog::error("AudioDevice::init: Device capability parsing failed: 0x{:x}",
-                  static_cast<int>(parseResult.error()));
-  } else {
-    spdlog::info(
-        "AudioDevice::init: Device capability parsing completed successfully.");
+  if (hasAvcCapability_ && commandInterface_)
+  {
+      auto parser = std::make_shared<DeviceParser>(this);
+      auto parseResult = parser->parse();
+      if (!parseResult)
+      {
+          spdlog::error("AudioDevice::init: Device capability parsing failed: 0x{:x}",
+                        static_cast<int>(parseResult.error()));
+          // Non-fatal error - device might still be usable with limited functionality
+      }
+      else
+      {
+          spdlog::info(
+              "AudioDevice::init: Device capability parsing completed successfully.");
+      }
+  }
+  else
+  {
+      spdlog::info("AudioDevice::init: Skipping capability discovery for non-AVC device.");
+      // Initialize with basic capabilities for non-AVC devices
+      initializeBasicCapabilities();
   }
 
   spdlog::info("AudioDevice::init completed successfully for GUID: 0x{:x}",
@@ -374,6 +384,58 @@ IOReturn AudioDevice::readVendorAndModelInfo() {
   return kIOReturnSuccess;
 }
 
+bool AudioDevice::isDICEDevice() const
+{
+    return hasDICESupport_;
+}
+
+void AudioDevice::detectDICESupport()
+{
+    // DICE devices typically have specific vendor IDs and specific registers
+    // This is a placeholder implementation - you'll need to adapt it for your specific DICE device
+
+    // Check vendor ID - TC Applied Technologies Ltd. (TCAT) is 0x000166 for DICE
+    if (vendorID_ == 0x000166)
+    {
+        spdlog::info("AudioDevice::detectDICESupport: Found TCAT vendor ID (0x000166) - likely DICE device");
+        hasDICESupport_ = true;
+        return;
+    }
+
+    // For other DICE vendors or more specific detection:
+    // Example: Check if there are specific DICE properties
+    if (fwDevice_)
+    {
+        CFMutableDictionaryRef properties = nullptr;
+        IOReturn result = IORegistryEntryCreateCFProperties(
+            fwDevice_, &properties, kCFAllocatorDefault, kNilOptions);
+
+        if (result == kIOReturnSuccess && properties)
+        {
+            // Look for properties that might indicate DICE
+            // For example, some devices expose a "DICE" property or specific model strings
+
+            CFStringRef modelName = (CFStringRef)CFDictionaryGetValue(
+                properties, CFSTR("Model"));
+
+            if (modelName && CFGetTypeID(modelName) == CFStringGetTypeID())
+            {
+                std::string model = Helpers::cfStringToString(modelName);
+                if (model.find("DICE") != std::string::npos ||
+                    model.find("dice") != std::string::npos)
+                {
+                    spdlog::info("AudioDevice::detectDICESupport: Found DICE in model name: {}", model);
+                    hasDICESupport_ = true;
+                }
+            }
+
+            CFRelease(properties);
+        }
+    }
+
+    // You could also try to read a known DICE register as a test
+}
+
 // --- PRIVATE HELPERS ---
 std::expected<void, IOKitError> AudioDevice::checkControlResponse(
     const std::expected<std::vector<uint8_t>, IOKitError> &result,
@@ -498,58 +560,65 @@ std::vector<uint8_t> AudioDevice::buildSetStreamFormatControlCmd(
 std::expected<void, IOKitError> AudioDevice::connectMusicPlug(
     uint8_t musicPlugType, uint16_t musicPlugID, uint8_t destSubunitPlugID,
     uint8_t streamPosition0, uint8_t streamPosition1) {
-  if (!commandInterface_)
-    return std::unexpected(IOKitError::NotReady);
-  if (!info_.hasMusicSubunit())
-    return std::unexpected(IOKitError::NotFound);
-  spdlog::info("AudioDevice::connectMusicPlug: Type=0x{:02x}, ID={}, "
-               "DestPlug={}, StreamPos=[{}, {}]",
-               musicPlugType, musicPlugID, destSubunitPlugID, streamPosition0,
-               streamPosition1);
-  std::vector<uint8_t> cmd = buildDestPlugConfigureControlCmd(
-      kAVCDestPlugSubfuncConnect, musicPlugType, musicPlugID, destSubunitPlugID,
-      streamPosition0, streamPosition1);
-  spdlog::trace(" -> Sending Connect Music Plug command (0x40/00): {}",
-                Helpers::formatHexBytes(cmd));
-  auto result = commandInterface_->sendCommand(cmd);
-  auto check = checkControlResponse(result, "ConnectMusicPlug(0x40/00)");
-  if (!check)
-    return check;
-  return checkDestPlugConfigureControlSubcommandResponse(
-      result.value(), "ConnectMusicPlug(0x40/00)");
+    if (!hasAvcCapability_)
+        return std::unexpected(IOKitError::Unsupported);
+    if (!commandInterface_)
+        return std::unexpected(IOKitError::NotReady);
+    if (!info_.hasMusicSubunit())
+        return std::unexpected(IOKitError::NotFound);
+    spdlog::info("AudioDevice::connectMusicPlug: Type=0x{:02x}, ID={}, "
+                 "DestPlug={}, StreamPos=[{}, {}]",
+                 musicPlugType, musicPlugID, destSubunitPlugID, streamPosition0,
+                 streamPosition1);
+    std::vector<uint8_t> cmd = buildDestPlugConfigureControlCmd(
+        kAVCDestPlugSubfuncConnect, musicPlugType, musicPlugID, destSubunitPlugID,
+        streamPosition0, streamPosition1);
+    spdlog::trace(" -> Sending Connect Music Plug command (0x40/00): {}",
+                  Helpers::formatHexBytes(cmd));
+    auto result = commandInterface_->sendCommand(cmd);
+    auto check = checkControlResponse(result, "ConnectMusicPlug(0x40/00)");
+    if (!check)
+        return check;
+    return checkDestPlugConfigureControlSubcommandResponse(
+        result.value(), "ConnectMusicPlug(0x40/00)");
 }
 
 std::expected<void, IOKitError>
 AudioDevice::disconnectMusicPlug(uint8_t musicPlugType, uint16_t musicPlugID) {
-  if (!commandInterface_)
-    return std::unexpected(IOKitError::NotReady);
-  if (!info_.hasMusicSubunit())
-    return std::unexpected(IOKitError::NotFound);
-  spdlog::info("AudioDevice::disconnectMusicPlug: Type=0x{:02x}, ID={}",
-               musicPlugType, musicPlugID);
-  std::vector<uint8_t> cmd = buildDestPlugConfigureControlCmd(
-      kAVCDestPlugSubfuncDisconnect, musicPlugType, musicPlugID, 0xFF, 0xFF,
-      0xFF);
-  spdlog::trace(" -> Sending Disconnect Music Plug command (0x40/02): {}",
-                Helpers::formatHexBytes(cmd));
-  auto result = commandInterface_->sendCommand(cmd);
-  auto check = checkControlResponse(result, "DisconnectMusicPlug(0x40/02)");
-  if (!check)
-    return check;
-  return checkDestPlugConfigureControlSubcommandResponse(
-      result.value(), "DisconnectMusicPlug(0x40/02)");
+    if (!hasAvcCapability_)
+        return std::unexpected(IOKitError::Unsupported);
+    if (!commandInterface_)
+        return std::unexpected(IOKitError::NotReady);
+    if (!info_.hasMusicSubunit())
+        return std::unexpected(IOKitError::NotFound);
+    spdlog::info("AudioDevice::disconnectMusicPlug: Type=0x{:02x}, ID={}",
+                 musicPlugType, musicPlugID);
+    std::vector<uint8_t> cmd = buildDestPlugConfigureControlCmd(
+        kAVCDestPlugSubfuncDisconnect, musicPlugType, musicPlugID, 0xFF, 0xFF,
+        0xFF);
+    spdlog::trace(" -> Sending Disconnect Music Plug command (0x40/02): {}",
+                  Helpers::formatHexBytes(cmd));
+    auto result = commandInterface_->sendCommand(cmd);
+    auto check = checkControlResponse(result, "DisconnectMusicPlug(0x40/02)");
+    if (!check)
+        return check;
+    return checkDestPlugConfigureControlSubcommandResponse(
+        result.value(), "DisconnectMusicPlug(0x40/02)");
 }
 
 std::expected<void, IOKitError> AudioDevice::setUnitIsochPlugStreamFormat(
     PlugDirection direction, uint8_t plugNum, const AudioStreamFormat &format) {
-  if (!commandInterface_)
-    return std::unexpected(IOKitError::NotReady);
-  if (plugNum >= 0x80) {
-    spdlog::error(
-        "setUnitIsochPlugStreamFormat: Invalid plug number {} for Iso plug.",
-        plugNum);
-    return std::unexpected(IOKitError::BadArgument);
-  }
+    if (!hasAvcCapability_)
+        return std::unexpected(IOKitError::Unsupported);
+    if (!commandInterface_)
+        return std::unexpected(IOKitError::NotReady);
+    if (plugNum >= 0x80)
+    {
+        spdlog::error(
+            "setUnitIsochPlugStreamFormat: Invalid plug number {} for Iso plug.",
+            plugNum);
+        return std::unexpected(IOKitError::BadArgument);
+    }
   spdlog::info("AudioDevice::setUnitIsochPlugStreamFormat: Dir={}, PlugNum={}, "
                "Format=[{}]",
                (direction == PlugDirection::Input ? "Input" : "Output"),
@@ -576,96 +645,141 @@ std::expected<void, IOKitError> AudioDevice::setUnitIsochPlugStreamFormat(
 std::expected<void, IOKitError> AudioDevice::changeMusicPlugConnection(
     uint8_t musicPlugType, uint16_t musicPlugID, uint8_t newDestSubunitPlugID,
     uint8_t newStreamPosition0, uint8_t newStreamPosition1) {
-  if (!commandInterface_)
-    return std::unexpected(IOKitError::NotReady);
-  if (!info_.hasMusicSubunit())
-    return std::unexpected(IOKitError::NotFound);
+    if (!hasAvcCapability_)
+        return std::unexpected(IOKitError::Unsupported);
+    if (!commandInterface_)
+        return std::unexpected(IOKitError::NotReady);
+    if (!info_.hasMusicSubunit())
+        return std::unexpected(IOKitError::NotFound);
 
-  spdlog::info("AudioDevice::changeMusicPlugConnection: Type=0x{:02x}, ID={}, "
-               "NewDestPlug={}, NewStreamPos=[{}, {}]",
-               musicPlugType, musicPlugID, newDestSubunitPlugID,
-               newStreamPosition0, newStreamPosition1);
+    spdlog::info("AudioDevice::changeMusicPlugConnection: Type=0x{:02x}, ID={}, "
+                 "NewDestPlug={}, NewStreamPos=[{}, {}]",
+                 musicPlugType, musicPlugID, newDestSubunitPlugID,
+                 newStreamPosition0, newStreamPosition1);
 
-  std::vector<uint8_t> cmd = buildDestPlugConfigureControlCmd(
-      kAVCDestPlugSubfuncChangeConnection, // Subfunction 0x01
-      musicPlugType, musicPlugID,
-      newDestSubunitPlugID, // New destination
-      newStreamPosition0,   // New stream pos
-      newStreamPosition1);  // New stream pos
+    std::vector<uint8_t> cmd = buildDestPlugConfigureControlCmd(
+        kAVCDestPlugSubfuncChangeConnection, // Subfunction 0x01
+        musicPlugType, musicPlugID,
+        newDestSubunitPlugID, // New destination
+        newStreamPosition0,   // New stream pos
+        newStreamPosition1);  // New stream pos
 
-  spdlog::trace(
-      " -> Sending Change Music Plug Connection command (0x40/01): {}",
-      Helpers::formatHexBytes(cmd));
-  auto result = commandInterface_->sendCommand(cmd);
+    spdlog::trace(
+        " -> Sending Change Music Plug Connection command (0x40/01): {}",
+        Helpers::formatHexBytes(cmd));
+    auto result = commandInterface_->sendCommand(cmd);
 
-  auto check =
-      checkControlResponse(result, "ChangeMusicPlugConnection(0x40/01)");
-  if (!check)
-    return check;
+    auto check =
+        checkControlResponse(result, "ChangeMusicPlugConnection(0x40/01)");
+    if (!check)
+        return check;
 
-  return checkDestPlugConfigureControlSubcommandResponse(
-      result.value(), "ChangeMusicPlugConnection(0x40/01)");
+    return checkDestPlugConfigureControlSubcommandResponse(
+        result.value(), "ChangeMusicPlugConnection(0x40/01)");
 }
 
 std::expected<void, IOKitError>
 AudioDevice::disconnectAllMusicPlugs(uint8_t fromDestSubunitPlugID) {
-  if (!commandInterface_)
-    return std::unexpected(IOKitError::NotReady);
-  if (!info_.hasMusicSubunit())
-    return std::unexpected(IOKitError::NotFound);
+    if (!hasAvcCapability_)
+        return std::unexpected(IOKitError::Unsupported);
+    if (!commandInterface_)
+        return std::unexpected(IOKitError::NotReady);
+    if (!info_.hasMusicSubunit())
+        return std::unexpected(IOKitError::NotFound);
 
-  spdlog::info("AudioDevice::disconnectAllMusicPlugs: FromDestPlugID={}",
-               fromDestSubunitPlugID);
+    spdlog::info("AudioDevice::disconnectAllMusicPlugs: FromDestPlugID={}",
+                 fromDestSubunitPlugID);
 
-  std::vector<uint8_t> cmd = buildDestPlugConfigureControlCmd(
-      kAVCDestPlugSubfuncDisconnectAll, // Subfunction 0x03
-      0xFF,                             // musicPlugType = FF
-      0xFFFF,                           // musicPlugID = FFFF
-      fromDestSubunitPlugID, // Specify which destination plug to clear
-      0xFF,                  // streamPosition[0] = FF
-      0xFF);                 // streamPosition[1] = FF
+    std::vector<uint8_t> cmd = buildDestPlugConfigureControlCmd(
+        kAVCDestPlugSubfuncDisconnectAll, // Subfunction 0x03
+        0xFF,                             // musicPlugType = FF
+        0xFFFF,                           // musicPlugID = FFFF
+        fromDestSubunitPlugID,            // Specify which destination plug to clear
+        0xFF,                             // streamPosition[0] = FF
+        0xFF);                            // streamPosition[1] = FF
 
-  spdlog::trace(" -> Sending Disconnect All Music Plugs command (0x40/03): {}",
-                Helpers::formatHexBytes(cmd));
-  auto result = commandInterface_->sendCommand(cmd);
+    spdlog::trace(" -> Sending Disconnect All Music Plugs command (0x40/03): {}",
+                  Helpers::formatHexBytes(cmd));
+    auto result = commandInterface_->sendCommand(cmd);
 
-  auto check = checkControlResponse(result, "DisconnectAllMusicPlugs(0x40/03)");
-  if (!check)
-    return check;
+    auto check = checkControlResponse(result, "DisconnectAllMusicPlugs(0x40/03)");
+    if (!check)
+        return check;
 
-  return checkDestPlugConfigureControlSubcommandResponse(
-      result.value(), "DisconnectAllMusicPlugs(0x40/03)");
+    return checkDestPlugConfigureControlSubcommandResponse(
+        result.value(), "DisconnectAllMusicPlugs(0x40/03)");
 }
 
 std::expected<void, IOKitError> AudioDevice::defaultConfigureMusicPlugs() {
-  if (!commandInterface_)
-    return std::unexpected(IOKitError::NotReady);
-  if (!info_.hasMusicSubunit())
-    return std::unexpected(IOKitError::NotFound);
+    if (!hasAvcCapability_)
+        return std::unexpected(IOKitError::Unsupported);
+    if (!commandInterface_)
+        return std::unexpected(IOKitError::NotReady);
+    if (!info_.hasMusicSubunit())
+        return std::unexpected(IOKitError::NotFound);
 
-  spdlog::info("AudioDevice::defaultConfigureMusicPlugs: Resetting connections "
-               "to default.");
+    spdlog::info("AudioDevice::defaultConfigureMusicPlugs: Resetting connections "
+                 "to default.");
 
-  std::vector<uint8_t> cmd = buildDestPlugConfigureControlCmd(
-      kAVCDestPlugSubfuncDefaultConfigure, // Subfunction 0x04
-      0xFF,                                // musicPlugType = FF
-      0xFFFF,                              // musicPlugID = FFFF
-      0xFF,                                // destSubunitPlugID = FF
-      0xFF,                                // streamPosition[0] = FF
-      0xFF);                               // streamPosition[1] = FF
+    std::vector<uint8_t> cmd = buildDestPlugConfigureControlCmd(
+        kAVCDestPlugSubfuncDefaultConfigure, // Subfunction 0x04
+        0xFF,                                // musicPlugType = FF
+        0xFFFF,                              // musicPlugID = FFFF
+        0xFF,                                // destSubunitPlugID = FF
+        0xFF,                                // streamPosition[0] = FF
+        0xFF);                               // streamPosition[1] = FF
 
-  spdlog::trace(
-      " -> Sending Default Configure Music Plugs command (0x40/04): {}",
-      Helpers::formatHexBytes(cmd));
-  auto result = commandInterface_->sendCommand(cmd);
+    spdlog::trace(
+        " -> Sending Default Configure Music Plugs command (0x40/04): {}",
+        Helpers::formatHexBytes(cmd));
+    auto result = commandInterface_->sendCommand(cmd);
 
-  auto check =
-      checkControlResponse(result, "DefaultConfigureMusicPlugs(0x40/04)");
-  if (!check)
-    return check;
+    auto check =
+        checkControlResponse(result, "DefaultConfigureMusicPlugs(0x40/04)");
+    if (!check)
+        return check;
 
-  return checkDestPlugConfigureControlSubcommandResponse(
-      result.value(), "DefaultConfigureMusicPlugs(0x40/04)");
+    return checkDestPlugConfigureControlSubcommandResponse(
+        result.value(), "DefaultConfigureMusicPlugs(0x40/04)");
 }
 
+void AudioDevice::initializeBasicCapabilities()
+{
+    spdlog::info("AudioDevice::initializeBasicCapabilities: Setting up basic capabilities for non-AVC device");
+
+    // Check if device supports isochronous transfers
+    bool hasIsochronousCapability = false;
+
+    if (deviceInterface)
+    {
+        // Try to determine if device has isochronous capabilities
+        CFMutableDictionaryRef properties = nullptr;
+        IOReturn result = IORegistryEntryCreateCFProperties(
+            fwDevice_, &properties, kCFAllocatorDefault, kNilOptions);
+
+        if (result == kIOReturnSuccess && properties)
+        {
+            // Look for properties that might indicate isochronous capability
+            CFBooleanRef isoCapable = (CFBooleanRef)CFDictionaryGetValue(
+                properties, CFSTR("IOFireWireIsochronousCapabilities"));
+
+            if (isoCapable && CFGetTypeID(isoCapable) == CFBooleanGetTypeID())
+            {
+                hasIsochronousCapability = CFBooleanGetValue(isoCapable);
+                spdlog::info("AudioDevice::initializeBasicCapabilities: Device has isochronous capability: {}",
+                             hasIsochronousCapability ? "YES" : "NO");
+            }
+
+            // Release properties when done
+            CFRelease(properties);
+        }
+    }
+
+    // Initialize device info with basic FireWire capabilities
+    // Set up the device info with basic information we've gathered
+
+    spdlog::info("AudioDevice::initializeBasicCapabilities: Device will have limited functionality");
+    spdlog::info("AudioDevice::initializeBasicCapabilities: GUID: 0x{:x}, Vendor: {}, Model: {}",
+                 guid_, vendorName_, deviceName_);
+}
 } // namespace FWA

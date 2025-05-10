@@ -15,6 +15,7 @@
 #include <utility> // Added for std::expected
 
 #include "FWA/AudioDevice.h"
+#include "FWA/dice/DiceAudioDevice.h"    // Include DiceAudioDevice header
 #include "FWA/DeviceController.h"        // Include full definition
 #include "FWA/DeviceDiscoverySolution.h" // Include for DICE device detection
 #include "FWA/Error.h"
@@ -247,22 +248,23 @@ void IOKitFireWireDeviceDiscovery::deviceAdded(void *refCon,
     }
 
     // Test if this is a DICE device by trying to read DICE registers
-    if (!FWA::DeviceDiscoverySolution::IsDiceDevice(deviceInterface, guid)) {
-      spdlog::info("deviceAdded: Device is not a DICE device - skipping");
-      (*deviceInterface)->Release(deviceInterface);
-      IOObjectRelease(device_service);
-      continue;
-    }
-
-    // If we get here, this is a DICE device!
-    spdlog::info("deviceAdded: DICE device detected! Configuring...");
+    bool isDiceDevice = FWA::DeviceDiscoverySolution::IsDiceDevice(deviceInterface);
 
     // Release the temporary device interface used for IsDiceDevice check
     (*deviceInterface)->Release(deviceInterface);
     deviceInterface = nullptr; // Nullify pointer after release
 
-    // --- Extract Device Name and Vendor Name directly from device_service
-    // properties ---
+    if (!isDiceDevice)
+    {
+        spdlog::info("deviceAdded: Device is not a DICE device - skipping");
+        IOObjectRelease(device_service);
+        continue;
+    }
+
+    // If we get here, this is a DICE device!
+    spdlog::info("deviceAdded: DICE device detected! Configuring...");
+
+    // --- Extract Device Name and Vendor Name directly from device_service properties ---
     std::string deviceName = "Unknown Device";
     std::string vendorName = "Unknown Vendor";
     CFMutableDictionaryRef deviceProps = nullptr;
@@ -287,48 +289,49 @@ void IOKitFireWireDeviceDiscovery::deviceAdded(void *refCon,
     }
     // --- End Property Extraction ---
 
-    // --- Create AudioDevice directly using the modified constructor ---
+    // --- Create appropriate device type based on DICE detection ---
     std::shared_ptr<AudioDevice> newAudioDevice = nullptr;
     try {
-      // Pass device_service directly as the fwDeviceService
-      newAudioDevice = std::make_shared<AudioDevice>(
-          guid, deviceName, vendorName, device_service,
-          self->deviceController_.get());
+        // Create DiceAudioDevice since we confirmed it's a DICE device
+        spdlog::info("deviceAdded: Creating DiceAudioDevice for GUID 0x{:x}", guid);
+        newAudioDevice = std::make_shared<DiceAudioDevice>(
+            guid, deviceName, vendorName, device_service,
+            self->deviceController_.get());
     } catch (const std::bad_alloc &e) {
-      spdlog::critical("deviceAdded: Failed to allocate memory for AudioDevice "
-                       "(GUID: 0x{:x}): {}",
-                       guid, e.what());
-      newAudioDevice = nullptr; // Ensure it's null
+        spdlog::critical("deviceAdded: Failed to allocate memory for DiceAudioDevice "
+                         "(GUID: 0x{:x}): {}",
+                         guid, e.what());
+        newAudioDevice = nullptr; // Ensure it's null
     } catch (...) {
-      spdlog::critical("deviceAdded: Unknown exception during AudioDevice "
-                       "creation (GUID: 0x{:x})",
-                       guid);
-      newAudioDevice = nullptr; // Ensure it's null
+        spdlog::critical("deviceAdded: Unknown exception during DiceAudioDevice "
+                         "creation (GUID: 0x{:x})",
+                         guid);
+        newAudioDevice = nullptr; // Ensure it's null
     }
 
     if (!newAudioDevice) {
-      spdlog::error(
-          "deviceAdded: Failed to create AudioDevice instance for GUID 0x{:x}",
-          guid);
-      // Release the io_service_t reference obtained from the iterator if
-      // creation failed
-      IOObjectRelease(device_service);
-      continue; // Skip to the next device
+        spdlog::error(
+            "deviceAdded: Failed to create DiceAudioDevice instance for GUID 0x{:x}",
+            guid);
+        // Release the io_service_t reference obtained from the iterator if
+        // creation failed
+        IOObjectRelease(device_service);
+        continue; // Skip to the next device
     }
 
-    // --- Initialize the created AudioDevice ---
+    // --- Initialize the created DiceAudioDevice ---
     auto initResult = newAudioDevice->init();
     if (!initResult) {
-      spdlog::error("deviceAdded: Failed to initialize AudioDevice for GUID "
-                    "0x{:x}: 0x{:x}",
-                    guid, static_cast<int>(initResult.error()));
-      // AudioDevice destructor will handle releasing retained IO objects
-      // Release the io_service_t reference obtained from the iterator
-      IOObjectRelease(device_service);
-      continue; // Skip to the next device
+        spdlog::error("deviceAdded: Failed to initialize DiceAudioDevice for GUID "
+                      "0x{:x}: 0x{:x}",
+                      guid, static_cast<int>(initResult.error()));
+        // DiceAudioDevice destructor will handle releasing retained IO objects
+        // Release the io_service_t reference obtained from the iterator
+        IOObjectRelease(device_service);
+        continue; // Skip to the next device
     }
 
-    spdlog::info("deviceAdded: AudioDevice created and initialized "
+    spdlog::info("deviceAdded: DiceAudioDevice created and initialized "
                  "successfully for GUID 0x{:x}",
                  guid);
 
@@ -350,151 +353,6 @@ void IOKitFireWireDeviceDiscovery::deviceAdded(void *refCon,
   }
   spdlog::info("deviceAdded: Finished iterating devices");
 }
-
-/* // Commenting out the old createAudioDevice function as it's replaced by
-direct creation in deviceAdded std::expected<std::shared_ptr<AudioDevice>,
-IOKitError> IOKitFireWireDeviceDiscovery:: createAudioDevice(io_object_t device)
-{
-    spdlog::info("createAudioDevice: Entered function");
-
-    CFMutableDictionaryRef properties = nullptr;
-    IOReturn result =
-            IORegistryEntryCreateCFProperties(device, &properties,
-kCFAllocatorDefault, kNilOptions); if (result != kIOReturnSuccess || properties
-== nullptr)
-    {
-        spdlog::error("createAudioDevice: Failed to get device properties: {}",
-result); if (properties) CFRelease(properties); return
-std::unexpected(static_cast<IOKitError>(result));
-    }
-    spdlog::info("createAudioDevice: Got device properties");
-
-    // display the dictionary
-    // FWA::Helpers::printCFDictionary(properties); //Keep this, VERY useful
-
-    // 1. Get the GUID.
-    CFNumberRef guidNumber = (CFNumberRef)CFDictionaryGetValue(properties,
-CFSTR("GUID")); if (guidNumber == nullptr)
-    {
-        spdlog::error("createAudioDevice: Device missing GUID");
-        CFRelease(properties);
-        return std::unexpected(static_cast<IOKitError>(kIOReturnNotFound));
-    }
-    spdlog::info("createAudioDevice: Got GUID CFNumberRef");
-
-    UInt64 guid;
-    if (!CFNumberGetValue(guidNumber, kCFNumberSInt64Type, &guid))
-    {
-        spdlog::error("createAudioDevice: Failed to get GUID value");
-        CFRelease(properties);
-        return std::unexpected(static_cast<IOKitError>(kIOReturnBadArgument));
-    }
-    spdlog::info("createAudioDevice: Got GUID value");
-
-    // 2. Get the device name.
-    CFStringRef nameRef =
-            (CFStringRef)CFDictionaryGetValue(properties, CFSTR("FireWire
-Product Name")); std::string deviceName = "Unknown Device"; // Default value. if
-(nameRef != nullptr)
-    {
-        char nameBuffer[256]; // Choose a reasonable buffer size.
-        if (CFStringGetCString(nameRef, nameBuffer, sizeof(nameBuffer),
-kCFStringEncodingUTF8))
-        {
-            deviceName = nameBuffer;
-        }
-    }
-    spdlog::info("createAudioDevice: Got device name");
-
-    // 3. Get the vendor name.
-    CFStringRef vendorRef =
-            (CFStringRef)CFDictionaryGetValue(properties, CFSTR("FireWire Vendor
-Name")); std::string vendorName = "Unknown Vendor"; // Default if (vendorRef !=
-nullptr)
-    {
-        char vendorBuffer[256];
-        if (CFStringGetCString(vendorRef, vendorBuffer, sizeof(vendorBuffer),
-                                                     kCFStringEncodingUTF8))
-        {
-            vendorName = vendorBuffer;
-        }
-    }
-    spdlog::info("createAudioDevice: Got vendor name");
-
-    CFRelease(properties); // *CRITICAL*: Release the properties dictionary.
-
-    // Get the AVC Unit service (io_object_t).  This is what we'll use for
-    // communication. We traverse from "device" (IOFireWireAVCUnit) to its Unit,
-using
-    // IORegistryEntryGetParentEntry
-    io_service_t avcUnit = 0;
-
-    spdlog::info("AVC Device before getting parent entry");
-    // DEBUG:
-    char className[256];
-    IOObjectGetClass(device, className);
-    spdlog::info("device class: {}", className);
-
-    result = IORegistryEntryGetParentEntry(device, kIOServicePlane, &avcUnit);
-    if (result != kIOReturnSuccess)
-    {
-        spdlog::error("createAudioDevice: Failed to get parent AVC unit entry:
-{}", result); return std::unexpected(static_cast<IOKitError>(result));
-    }
-    if (!avcUnit)
-    {
-        spdlog::error("createAudioDevice: Failed to get avcUnit");
-        return std::unexpected(static_cast<IOKitError>(kIOReturnNotFound));
-    }
-
-    // DEBUG:
-    spdlog::info("AVC Device after getting parent entry");
-    IOObjectGetClass(device, className);
-    spdlog::info("device class: {}", className);
-
-    // ---- Add interest notification for THIS device ----
-
-    io_object_t interestNotification = 0; // This will hold the notification
-object.
-
-    // Set up interest-based notification for removal
-    result = IOServiceAddInterestNotification(
-            notifyPort_,						// The
-notification port  <----- Use notifyPort_ here. device,
-// The service object representing AV/C Unit kIOGeneralInterest,
-// The type of interest deviceInterestCallback, // The callback function this,
-// refCon: Pass 'this' pointer. &interestNotification		// Store the
-notification object for later removal
-    );
-
-    if (result != kIOReturnSuccess)
-    {
-        spdlog::error("createAudioDevice: Failed to add interest notification:
-{}", result); IOObjectRelease(avcUnit); // Release avcUnit if failed. return
-std::unexpected(static_cast<IOKitError>(result));
-    }
-
-    // Now is safe to create device, with all io objects it needs.
-    // Create the AudioDevice, passing in the required parameters.
-    std::shared_ptr<AudioDevice> audioDevice = std::make_shared<AudioDevice>(
-            guid, deviceName, vendorName, device, deviceController_.get());
-
-    // Release the local reference to avcUnit, AudioDevice now owns it
-    IOObjectRelease(device);
-
-    // --- Initialize the AudioDevice ---
-    auto initResult = audioDevice->init();
-    if (!initResult)
-    {
-        spdlog::error("Failed to initialize AudioDevice: 0x{:x}",
-                                    static_cast<int>(initResult.error()));
-        // DO NOT release the device object here; the AudioDevice destructor
-handles it. return std::unexpected(initResult.error());
-    }
-
-    return audioDevice; // Return smart pointer
-}
-*/
 
 void IOKitFireWireDeviceDiscovery::setTestCallback(
     DeviceNotificationCallback callback) {

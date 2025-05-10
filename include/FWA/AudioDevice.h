@@ -214,6 +214,16 @@ public:
    * @return Success or IOKitError.
    */
   std::expected<void, IOKitError> defaultConfigureMusicPlugs();
+
+  // Check if device has AVC capability
+  bool hasAvcCapability() const { return hasAvcCapability_; }
+
+  // Get the FireWire device (for DICE access)
+  io_object_t getFireWireDevice() const { return fwDevice_; }
+
+  // DICE detection
+  bool isDICEDevice() const;
+
   // --- END NEW CONTROL METHODS ---
 
 protected: // Changed from private to allow derived class access
@@ -264,6 +274,8 @@ private:
   // ---- NEW MEMBERS ----
   uint32_t vendorID_ = 0;
   uint32_t modelID_ = 0;
+  bool hasAvcCapability_ = false; // Flag indicating if device has AVC capability
+  bool hasDICESupport_ = false;   // Flag indicating if device has DICE support
   // -------------------
 
   // --- NEW PRIVATE HELPERS ---
@@ -283,6 +295,12 @@ private:
   std::expected<void, IOKitError>
   checkDestPlugConfigureControlSubcommandResponse(
       const std::vector<uint8_t> &response, const char *commandName);
+
+  // Initialize basic capabilities for non-AVC devices
+  void initializeBasicCapabilities();
+
+  // Helper to detect DICE device
+  void detectDICESupport();
   // --- END NEW PRIVATE HELPERS ---
 
   friend class DeviceParser;

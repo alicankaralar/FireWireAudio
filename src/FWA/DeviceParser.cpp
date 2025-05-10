@@ -280,12 +280,10 @@ DeviceParser::DeviceParser(AudioDevice* device)
     if (auto iface = device_->getCommandInterface()) {
          commandInterface_ = iface.get();
          if (!commandInterface_) {
-              spdlog::critical("DeviceParser: Failed to get CommandInterface from AudioDevice.");
-              throw std::runtime_error("DeviceParser could not obtain CommandInterface.");
+             spdlog::info("DeviceParser: Failed to get CommandInterface from AudioDevice.");
          }
     } else {
-         spdlog::critical("DeviceParser: AudioDevice has no CommandInterface.");
-         throw std::runtime_error("DeviceParser requires an AudioDevice with a CommandInterface.");
+        spdlog::info("DeviceParser: AudioDevice has no CommandInterface.");
     }
 }
 
@@ -476,11 +474,21 @@ static std::expected<std::vector<uint8_t>, IOKitError> readDescriptorNonStandard
 }
 // ...existing code...
 std::expected<void, IOKitError> DeviceParser::parse() {
-    DescriptorAccessor descriptorAccessor(commandInterface_);
+    // Check if we have a CommandInterface
+    if (!commandInterface_)
+    {
+        spdlog::info("DeviceParser::parse: No CommandInterface available. Using basic device capabilities only.");
+        // Initialize basic capabilities for non-AVC devices
+        device_->initializeBasicCapabilities();
+        return {};
+    }
+
+    // Only create descriptor accessor when we have AVC capability
+    std::unique_ptr<DescriptorAccessor> descriptorAccessor = std::make_unique<DescriptorAccessor>(commandInterface_);
     UnitPlugDiscoverer unitDiscoverer(commandInterface_);
     SubunitDiscoverer subunitDiscoverer(commandInterface_);
     PlugDetailParser plugDetailParser(commandInterface_);
-    MusicSubunitDescriptorParser musicDescParser(descriptorAccessor);
+    MusicSubunitDescriptorParser musicDescParser(*descriptorAccessor);
 
     spdlog::info("DeviceParser: Starting capability parsing for GUID: 0x{:x}", device_->getGuid());
 
@@ -494,7 +502,7 @@ std::expected<void, IOKitError> DeviceParser::parse() {
         std::vector<uint8_t> unitIdSpecifier = DescriptorUtils::buildDescriptorSpecifier(
             DescriptorSpecifierType::UnitSubunitIdentifier, 0, 0, 0);
         triedUnitOpen = true;
-        auto openResult = descriptorAccessor.openForRead(0xFF, unitIdSpecifier);
+        auto openResult = descriptorAccessor->openForRead(0xFF, unitIdSpecifier);
 
         if (!openResult) {
             if (openResult.error() == IOKitError::Unsupported) {
@@ -508,15 +516,15 @@ std::expected<void, IOKitError> DeviceParser::parse() {
         } else {
             // UNIT OPEN succeeded! Try READ
             spdlog::debug("DeviceParser [Phase 1]: OPEN Unit Identifier successful. Reading...");
-            auto readResult = descriptorAccessor.read(0xFF, unitIdSpecifier, 0, 0);
-            auto closeResult = descriptorAccessor.close(0xFF, unitIdSpecifier);
+            auto readResult = descriptorAccessor->read(0xFF, unitIdSpecifier, 0, 0);
+            auto closeResult = descriptorAccessor->close(0xFF, unitIdSpecifier);
             if (!closeResult) { /* warn */ }
 
             if (readResult) {
                 unitSizes = parseUnitIdentifierDescriptorSizes(readResult.value());
                 if (unitSizes.valid) {
                     descriptorMechanismSupported_ = true; // Mark as supported *at the unit level*
-                    descriptorAccessor.updateDescriptorSizes(unitSizes.sizeOfListId, unitSizes.sizeOfObjectId, unitSizes.sizeOfEntryPos);
+                    descriptorAccessor->updateDescriptorSizes(unitSizes.sizeOfListId, unitSizes.sizeOfObjectId, unitSizes.sizeOfEntryPos);
                     spdlog::info("DeviceParser [Phase 1]: Successfully read Unit ID and parsed sizes. Descriptor Mechanism SUPPORTED by Unit.");
                 } else {
                      spdlog::warn("DeviceParser [Phase 1]: Read Unit ID data but failed to parse sizes. Descriptor mechanism support uncertain.");
@@ -547,7 +555,7 @@ std::expected<void, IOKitError> DeviceParser::parse() {
             DescriptorSpecifierType::UnitSubunitIdentifier, 0, 0, 0);
         triedSubunitOpen = true;
 
-        auto openSubunitResult = descriptorAccessor.openForRead(musicSubunitAddr, subunitIdSpecifier);
+        auto openSubunitResult = descriptorAccessor->openForRead(musicSubunitAddr, subunitIdSpecifier);
         if (!openSubunitResult) {
             if (openSubunitResult.error() == IOKitError::Unsupported) {
                  spdlog::info("DeviceParser [Phase 3]: Standard Descriptor Mechanism (OPEN) also not supported by Music SUBUNIT 0x{:02x}.", musicSubunitAddr);
@@ -558,9 +566,11 @@ std::expected<void, IOKitError> DeviceParser::parse() {
         } else {
             // Music SUBUNIT OPEN Succeeded! Try to READ its Identifier
             spdlog::debug("DeviceParser [Phase 3]: OPEN Music Subunit Identifier successful. Reading...");
-            auto readSubunitResult = descriptorAccessor.read(musicSubunitAddr, subunitIdSpecifier, 0, 0);
-            auto closeSubunitResult = descriptorAccessor.close(musicSubunitAddr, subunitIdSpecifier);
-             if (!closeSubunitResult) { /* warn */ }
+            auto readSubunitResult = descriptorAccessor->read(musicSubunitAddr, subunitIdSpecifier, 0, 0);
+            auto closeSubunitResult = descriptorAccessor->close(musicSubunitAddr, subunitIdSpecifier);
+            if (!closeSubunitResult)
+            { /* warn */
+            }
 
             if (!readSubunitResult) {
                  spdlog::warn("DeviceParser [Phase 3]: Failed to READ Music Subunit Identifier after successful OPEN: 0x{:x}. Static capabilities unavailable.", static_cast<int>(readSubunitResult.error()));
@@ -610,12 +620,12 @@ std::expected<void, IOKitError> DeviceParser::parse() {
           // ... (rest of the read/parse logic for static capabilities) ...
             std::vector<uint8_t> subunitDescriptorData;
             bool subunitReadOK = false;
-            auto openResult = descriptorAccessor.openForRead(musicSubunitAddr, subunitIdSpecifier);
+            auto openResult = descriptorAccessor->openForRead(musicSubunitAddr, subunitIdSpecifier);
             if (!openResult) {
                 spdlog::warn("DeviceParser [Phase 3 - Unit OK path]: Failed to OPEN Music Subunit Identifier (0x{:x}). Cannot read static capabilities.", static_cast<int>(openResult.error()));
             } else {
-                auto readResult = descriptorAccessor.read(musicSubunitAddr, subunitIdSpecifier, 0, 0);
-                auto closeResult = descriptorAccessor.close(musicSubunitAddr, subunitIdSpecifier);
+                auto readResult = descriptorAccessor->read(musicSubunitAddr, subunitIdSpecifier, 0, 0);
+                auto closeResult = descriptorAccessor->close(musicSubunitAddr, subunitIdSpecifier);
                 if (!closeResult) { /* warn */ }
                 if (!readResult) {
                     spdlog::warn("DeviceParser [Phase 3 - Unit OK path]: Failed to READ Music Subunit Identifier (0x{:x}). Cannot read static capabilities.", static_cast<int>(readResult.error()));

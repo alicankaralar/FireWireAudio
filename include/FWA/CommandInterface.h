@@ -6,6 +6,7 @@
 #include <string>
 #include <memory>
 #include <functional>
+#include <IOKit/firewire/IOFireWireLib.h>
 #include <IOKit/avc/IOFireWireAVCLib.h>
 #include "FWA/Error.h"
 
@@ -13,6 +14,9 @@ namespace FWA {
 
 // Forward declaration
 class AudioDevice;
+
+// Forward declaration of protocol enum
+enum class DeviceProtocol;
 
 /**
  * @brief Callback type for device status notifications
@@ -107,6 +111,18 @@ public:
     
     bool isActive() const { return avcInterface_ != 0; }
 
+    /**
+     * @brief Check if AVC protocol is supported
+     * @return True if AVC protocol is supported
+     */
+    bool isAVCSupported() const { return protocol_ == DeviceProtocol::AVC; }
+
+    /**
+     * @brief Check if DICE protocol is supported
+     * @return True if DICE protocol is supported
+     */
+    bool isDICESupported() const { return protocol_ == DeviceProtocol::DICE; }
+
 private:
     /**
      * @brief Create the AVC unit interface
@@ -119,6 +135,32 @@ private:
      * @return Success or error status
      */
     std::expected<void, IOKitError> releaseAVCUnitInterface();
+
+    /**
+     * @brief Create the DICE interface
+     * @return Success or error status
+     */
+    std::expected<void, IOKitError> createDICEInterface();
+
+    /**
+     * @brief Release the DICE interface
+     * @return Success or error status
+     */
+    std::expected<void, IOKitError> releaseDICEInterface();
+
+    /**
+     * @brief Send a command using the AVC protocol
+     * @param command Vector of bytes containing the command
+     * @return Response from the device or error status
+     */
+    std::expected<std::vector<uint8_t>, IOKitError> sendAVCCommand(const std::vector<uint8_t>& command);
+
+    /**
+     * @brief Send a command using the DICE protocol
+     * @param command Vector of bytes containing the command
+     * @return Response from the device or error status
+     */
+    std::expected<std::vector<uint8_t>, IOKitError> sendDICECommand(const std::vector<uint8_t>& command);
 
     /**
      * @brief Static callback for device interest notifications
@@ -136,7 +178,8 @@ private:
     io_object_t interestNotification_ = 0;
     DeviceStatusCallback notificationCallback_;
     void* refCon_ = nullptr;
-//    std::atomic<bool> active_ = false;
+    DeviceProtocol protocol_;
+    void* diceInterface_ = nullptr; // This would be your DICE interface type
 };
 
 } // namespace FWA
