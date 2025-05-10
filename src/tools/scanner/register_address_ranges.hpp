@@ -1,6 +1,7 @@
 #ifndef REGISTER_ADDRESS_RANGES_HPP
 #define REGISTER_ADDRESS_RANGES_HPP
 
+#include <IOKit/firewire/IOFireWireFamilyCommon.h>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -11,9 +12,8 @@ namespace FWA::SCANNER {
  * @brief Represents a group of registers within a contiguous address range
  */
 struct RegisterAddressRange {
-  uint64_t baseAddress; ///< Starting address of the range
-  std::vector<std::pair<uint64_t, uint32_t>>
-      registers; ///< Registers in this range
+  UInt64 baseAddress; ///< Starting address of the range
+  std::vector<std::pair<UInt64, UInt32>> registers; ///< Registers in this range
 };
 
 /**
@@ -28,7 +28,7 @@ struct RegisterAddressRange {
  * @return Vector of RegisterAddressRange structs containing grouped registers
  */
 std::vector<RegisterAddressRange>
-groupRegistersByAddressRange(const std::map<uint64_t, uint32_t> &registers);
+groupRegistersByAddressRange(const std::map<UInt64, UInt32> &registers);
 
 /**
  * @brief Processes each address range to extract coherent strings

@@ -1,5 +1,5 @@
 #include "endianness_helpers.hpp"
-#include "FWA/DiceAbsoluteAddresses.hpp"
+#include "FWA/dice/DiceAbsoluteAddresses.hpp"
 #include "io_helpers.hpp" // For safeReadQuadlet
 #include "scanner.hpp"    // For FireWireDevice
 
@@ -9,9 +9,9 @@
 namespace FWA::SCANNER {
 // Host system endianness detection
 static bool isHostLittleEndian() {
-  static const uint32_t test = 0x01020304;
+  static const UInt32 test = 0x01020304;
   static const bool isLittle =
-      (*reinterpret_cast<const uint8_t *>(&test) == 0x04);
+      (*reinterpret_cast<const UInt8 *>(&test) == 0x04);
   return isLittle;
 }
 
@@ -25,31 +25,30 @@ detectDeviceEndianness(IOFireWireDeviceInterface **deviceInterface,
   // This register has a specific format where the chip type is in a specific
   // bit position If interpreted with the wrong endianness, the chip type would
   // be invalid
-  uint64_t chipIdAddr = GPCSR_CHIP_ID_ADDR;
+  UInt64 chipIdAddr = GPCSR_CHIP_ID_ADDR;
   UInt32 chipIdValue = 0;
   IOReturn status = safeReadQuadlet(deviceInterface, service, chipIdAddr,
-                                    chipIdValue, generation);
+                                    &chipIdValue, generation);
 
   if (status == kIOReturnSuccess) {
     // Try little-endian interpretation
-    uint32_t littleEndianValue = CFSwapInt32LittleToHost(chipIdValue);
-    uint32_t chipTypeLittle =
+    UInt32 littleEndianValue = CFSwapInt32LittleToHost(chipIdValue);
+    UInt32 chipTypeLittle =
         (littleEndianValue & GPCSR_CHIP_ID_CHIP_TYPE_MASK) >>
         GPCSR_CHIP_ID_CHIP_TYPE_SHIFT;
 
     // Try big-endian interpretation
-    uint32_t bigEndianValue = CFSwapInt32BigToHost(chipIdValue);
-    uint32_t chipTypeBig = (bigEndianValue & GPCSR_CHIP_ID_CHIP_TYPE_MASK) >>
-                           GPCSR_CHIP_ID_CHIP_TYPE_SHIFT;
+    UInt32 bigEndianValue = CFSwapInt32BigToHost(chipIdValue);
+    UInt32 chipTypeBig = (bigEndianValue & GPCSR_CHIP_ID_CHIP_TYPE_MASK) >>
+                         GPCSR_CHIP_ID_CHIP_TYPE_SHIFT;
 
     // Check which interpretation gives a valid chip type
     bool validLittle =
-        (chipTypeLittle >= static_cast<uint32_t>(DiceChipType::DiceII) &&
-         chipTypeLittle <= static_cast<uint32_t>(DiceChipType::DiceJr));
+        (chipTypeLittle >= static_cast<UInt32>(DiceChipType::DiceII) &&
+         chipTypeLittle <= static_cast<UInt32>(DiceChipType::DiceJr));
 
-    bool validBig =
-        (chipTypeBig >= static_cast<uint32_t>(DiceChipType::DiceII) &&
-         chipTypeBig <= static_cast<uint32_t>(DiceChipType::DiceJr));
+    bool validBig = (chipTypeBig >= static_cast<UInt32>(DiceChipType::DiceII) &&
+                     chipTypeBig <= static_cast<UInt32>(DiceChipType::DiceJr));
 
     if (validLittle && !validBig) {
       std::cerr << "Info [Endianness]: Device detected as LITTLE_ENDIAN based "
@@ -77,19 +76,19 @@ detectDeviceEndianness(IOFireWireDeviceInterface **deviceInterface,
   // values when interpreted with the correct endianness
   if (!device.configRomVendorKeys.empty()) {
     for (const auto &pair : device.configRomVendorKeys) {
-      uint32_t key = pair.first;
+      UInt32 key = pair.first;
       if (key == 0x03 || key == 0x0C) // Common vendor key IDs
       {
         // Try to read the value at this address
-        uint64_t vendorAddr = pair.second;
+        UInt64 vendorAddr = pair.second;
         UInt32 vendorValue = 0;
         IOReturn status = safeReadQuadlet(deviceInterface, service, vendorAddr,
-                                          vendorValue, generation);
+                                          &vendorValue, generation);
 
         if (status == kIOReturnSuccess) {
           // For vendor IDs, big-endian is typically the correct interpretation
           // as FireWire is a big-endian bus
-          uint32_t bigEndianValue = CFSwapInt32BigToHost(vendorValue);
+          UInt32 bigEndianValue = CFSwapInt32BigToHost(vendorValue);
 
           // Check if the value looks like a valid vendor ID (non-zero,
           // reasonable range)
@@ -109,14 +108,14 @@ detectDeviceEndianness(IOFireWireDeviceInterface **deviceInterface,
   // endianness, that's likely the correct endianness
 
   // Try to read the device name or other string registers
-  uint64_t deviceNameAddr = DICE_DEVICE_NAME_ADDR;
+  UInt64 deviceNameAddr = DICE_DEVICE_NAME_ADDR;
   UInt32 nameValue = 0;
-  status = safeReadQuadlet(deviceInterface, service, deviceNameAddr, nameValue,
+  status = safeReadQuadlet(deviceInterface, service, deviceNameAddr, &nameValue,
                            generation);
 
   if (status == kIOReturnSuccess) {
     // Try little-endian interpretation
-    uint32_t littleEndianValue = CFSwapInt32LittleToHost(nameValue);
+    UInt32 littleEndianValue = CFSwapInt32LittleToHost(nameValue);
     std::string littleEndianStr;
     for (int i = 0; i < 4; i++) {
       char c = static_cast<char>((littleEndianValue >> (i * 8)) & 0xFF);
@@ -125,7 +124,7 @@ detectDeviceEndianness(IOFireWireDeviceInterface **deviceInterface,
     }
 
     // Try big-endian interpretation
-    uint32_t bigEndianValue = CFSwapInt32BigToHost(nameValue);
+    UInt32 bigEndianValue = CFSwapInt32BigToHost(nameValue);
     std::string bigEndianStr;
     for (int i = 0; i < 4; i++) {
       char c = static_cast<char>((bigEndianValue >> ((3 - i) * 8)) & 0xFF);
@@ -154,7 +153,7 @@ detectDeviceEndianness(IOFireWireDeviceInterface **deviceInterface,
   return DeviceEndianness::DEVICE_BIG_ENDIAN;
 }
 
-uint32_t deviceToHostInt32(uint32_t value, DeviceEndianness endianness) {
+UInt32 deviceToHostInt32(UInt32 value, DeviceEndianness endianness) {
   switch (endianness) {
   case DeviceEndianness::DEVICE_BIG_ENDIAN:
     return CFSwapInt32BigToHost(value);
@@ -164,8 +163,8 @@ uint32_t deviceToHostInt32(uint32_t value, DeviceEndianness endianness) {
   default:
     // For unknown endianness, try both and return the one that seems more
     // reasonable This is a fallback to the previous heuristic approach
-    uint32_t bigEndianValue = CFSwapInt32BigToHost(value);
-    uint32_t littleEndianValue = CFSwapInt32LittleToHost(value);
+    UInt32 bigEndianValue = CFSwapInt32BigToHost(value);
+    UInt32 littleEndianValue = CFSwapInt32LittleToHost(value);
 
     // Simple heuristic: if the value is a potential ASCII string, check which
     // has more printable chars
@@ -191,7 +190,7 @@ uint32_t deviceToHostInt32(uint32_t value, DeviceEndianness endianness) {
   }
 }
 
-uint32_t hostToDeviceInt32(uint32_t value, DeviceEndianness endianness) {
+UInt32 hostToDeviceInt32(UInt32 value, DeviceEndianness endianness) {
   switch (endianness) {
   case DeviceEndianness::DEVICE_BIG_ENDIAN:
     return CFSwapInt32HostToBig(value);
@@ -202,6 +201,22 @@ uint32_t hostToDeviceInt32(uint32_t value, DeviceEndianness endianness) {
     // For unknown endianness, default to big-endian (FireWire standard)
     return CFSwapInt32HostToBig(value);
   }
+}
+
+void byteSwapFromBus(UInt32 *data, size_t length) {
+  if (!data || length == 0) {
+    return;
+  }
+
+  // FireWire bus data is always in big-endian format (network byte order)
+  // If the host is little-endian, we need to swap bytes for each quadlet
+  if (isHostLittleEndian()) {
+    for (size_t i = 0; i < length; i++) {
+      data[i] = CFSwapInt32BigToHost(data[i]);
+    }
+  }
+  // If the host is big-endian, no swap is needed as the bus and host formats
+  // match
 }
 
 } // namespace FWA::SCANNER

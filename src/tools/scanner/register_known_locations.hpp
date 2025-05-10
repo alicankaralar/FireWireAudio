@@ -18,7 +18,7 @@ namespace FWA::SCANNER {
  * @param device The FireWireDevice struct containing register values
  * @return A map of register addresses to register values for further analysis
  */
-std::map<uint64_t, uint32_t>
+std::map<UInt64, UInt32>
 checkKnownStringLocations(const FireWireDevice &device);
 
 } // namespace FWA::SCANNER

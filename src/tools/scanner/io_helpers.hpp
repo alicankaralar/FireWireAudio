@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include <IOKit/IOKitLib.h>
 #include <IOKit/firewire/IOFireWireLib.h>
@@ -18,26 +19,62 @@ FireWireDevice getDeviceInfo(io_service_t device);
 // Set forceQuadlet to true to always use ReadQuadlet regardless of address (for
 // DICE registers)
 IOReturn safeReadQuadlet(IOFireWireDeviceInterface **deviceInterface,
-                         io_service_t service, uint64_t absoluteAddr,
-                         UInt32 &value, UInt32 generation,
-                         bool forceQuadlet = false);
+                         io_service_t service, UInt64 absoluteAddr,
+                         UInt32 *value, UInt32 generation);
 
 // Basic ReadQuadlet wrapper (gets generation if needed)
 // Set forceQuadlet to true to always use ReadQuadlet regardless of address (for
 // DICE registers)
 IOReturn readQuadlet(IOFireWireDeviceInterface **deviceInterface,
-                     io_service_t service, uint64_t absoluteAddr, UInt32 &value,
-                     UInt32 generation, bool forceQuadlet = false);
+                     io_service_t service, UInt64 absoluteAddr, UInt32 *value,
+                     UInt32 generation);
 
 // Safe wrapper for ReadBlock that uses setjmp/longjmp for segfault recovery
-IOReturn safeReadBlock(
-    IOFireWireDeviceInterface **deviceInterface, io_service_t service,
-    uint64_t absoluteAddr, void *buffer,
-    UInt32 &numBytes, // Input: requested size, Output: actual size read
-    UInt32 generation);
+IOReturn safeReadBlock(IOFireWireDeviceInterface **deviceInterface,
+                       io_service_t service, UInt64 absoluteAddr, UInt32 *value,
+                       UInt32 *size, UInt32 generation);
+
+// Basic ReadBlock wrapper (gets generation if needed)
+IOReturn readBlock(IOFireWireDeviceInterface **deviceInterface,
+                   io_service_t service, UInt64 absoluteAddr, UInt32 *value,
+                   UInt32 *size, UInt32 generation);
 
 // Helper function to interpret a 32-bit value as a potential ASCII string
 std::string interpretAsASCII(UInt32 value);
+
+IOReturn writeQuadlet(IOFireWireDeviceInterface **deviceInterface,
+                      io_service_t service, UInt64 absoluteAddr, UInt32 value,
+                      UInt32 generation = 0);
+
+IOReturn safeWriteQuadlet(IOFireWireDeviceInterface **deviceInterface,
+                          io_service_t service, UInt64 absoluteAddr,
+                          UInt32 value, UInt32 generation = 0);
+
+class stringlist : public std::vector<std::string> {
+public:
+  static stringlist splitString(std::string in, std::string delimiter) {
+    stringlist result;
+    size_type start = 0, end = 0;
+    while (start < in.size()) {
+      end = std::min(in.size(), in.find(delimiter, start));
+      result.push_back(in.substr(start, end - start));
+      start = end + delimiter.size();
+    }
+    return result;
+  }
+
+  std::string join(std::string joiner = "") {
+    std::string result;
+    for (stringlist::iterator it = begin(); it != end();) {
+      result += *it;
+      it++;
+      if (it != end()) {
+        result += joiner;
+      }
+    }
+    return result;
+  }
+};
 
 } // namespace FWA::SCANNER
 

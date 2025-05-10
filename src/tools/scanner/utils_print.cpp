@@ -81,9 +81,9 @@ void printDeviceInfo(const FireWireDevice &device) {
       // Iterate through the stored registers (which are stored with absolute
       // address keys)
       for (const auto &regPair : device.diceRegisters) {
-        uint64_t addr = regPair.first;
-        uint32_t rawValue = regPair.second; // Raw Big Endian value
-        uint32_t hostValue = CFSwapInt32LittleToHost(
+        UInt64 addr = regPair.first;
+        UInt32 rawValue = regPair.second; // Raw Big Endian value
+        UInt32 hostValue = CFSwapInt32LittleToHost(
             rawValue); // Convert to Host (Little Endian for DICE)
         std::string ascii = FWA::SCANNER::interpretAsASCII(hostValue);
 

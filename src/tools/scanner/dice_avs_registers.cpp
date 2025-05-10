@@ -1,6 +1,6 @@
 #include "dice_avs_registers.hpp"
-#include "FWA/DiceAbsoluteAddresses.hpp" // For DICE_REGISTER_BASE, etc.
-#include "endianness_helpers.hpp"        // For deviceToHostInt32
+#include "FWA/dice/DiceAbsoluteAddresses.hpp" // For DICE_REGISTER_BASE, etc.
+#include "endianness_helpers.hpp"             // For deviceToHostInt32
 #include "io_helpers.hpp" // For safeReadQuadlet, interpretAsASCII
 #include "scanner.hpp"    // For FireWireDevice, DiceDefines.hpp constants
 
@@ -15,21 +15,21 @@
 namespace FWA::SCANNER {
 void readAvsRegisters(IOFireWireDeviceInterface **deviceInterface,
                       io_service_t service, FireWireDevice &device,
-                      uint64_t /* discoveredDiceBase */, UInt32 generation) {
+                      UInt64 /* discoveredDiceBase */, UInt32 generation) {
   std::cerr << "Debug [DICE]: Reading AVS registers using absolute addresses..."
             << std::endl;
 
   // Read AVS Audio Receiver Config (for receiver 0)
-  uint64_t arxCfg0Addr =
+  UInt64 arxCfg0Addr =
       AVS_AUDIO_RECEIVER_CFG0_ADDR; // Use absolute address from
                                     // DiceAbsoluteAddresses.hpp
   UInt32 arxCfg0Value = 0;
   IOReturn status = FWA::SCANNER::safeReadQuadlet(
-      deviceInterface, service, arxCfg0Addr, arxCfg0Value, generation, true);
+      deviceInterface, service, arxCfg0Addr, &arxCfg0Value, generation);
   if (status == kIOReturnSuccess) {
     device.diceRegisters[arxCfg0Addr] = arxCfg0Value;
-    uint32_t hostValue = CFSwapInt32LittleToHost(arxCfg0Value);
-    device.avsRxChannelId = static_cast<uint8_t>(
+    UInt32 hostValue = CFSwapInt32LittleToHost(arxCfg0Value);
+    device.avsRxChannelId = static_cast<UInt8>(
         (hostValue &
          AVS_AUDIO_RECEIVER_CFG0_CHANNEL_ID_MASK) >> // Use constexpr mask
         AVS_AUDIO_RECEIVER_CFG0_CHANNEL_ID_SHIFT);   // Use constexpr shift
@@ -42,16 +42,16 @@ void readAvsRegisters(IOFireWireDeviceInterface **deviceInterface,
               << std::endl;
   }
 
-  uint64_t arxCfg1Addr =
+  UInt64 arxCfg1Addr =
       AVS_AUDIO_RECEIVER_CFG1_ADDR; // Use absolute address from
                                     // DiceAbsoluteAddresses.hpp
   UInt32 arxCfg1Value = 0;
   status = FWA::SCANNER::safeReadQuadlet(deviceInterface, service, arxCfg1Addr,
-                                         arxCfg1Value, generation, true);
+                                         &arxCfg1Value, generation);
   if (status == kIOReturnSuccess) {
     device.diceRegisters[arxCfg1Addr] = arxCfg1Value;
-    uint32_t hostValue = CFSwapInt32LittleToHost(arxCfg1Value);
-    device.avsRxDataBlockSize = static_cast<uint8_t>(
+    UInt32 hostValue = CFSwapInt32LittleToHost(arxCfg1Value);
+    device.avsRxDataBlockSize = static_cast<UInt8>(
         (hostValue &
          AVS_AUDIO_RECEIVER_CFG1_SPECIFIED_DBS_MASK) >> // Use constexpr mask
         AVS_AUDIO_RECEIVER_CFG1_SPECIFIED_DBS_SHIFT);   // Use constexpr shift
@@ -66,21 +66,21 @@ void readAvsRegisters(IOFireWireDeviceInterface **deviceInterface,
   }
 
   // Read AVS Audio Transmitter Config (for transmitter 0)
-  uint64_t atxCfgAddr =
+  UInt64 atxCfgAddr =
       AVS_AUDIO_TRANSMITTER_CFG_ADDR; // Use absolute address from
                                       // DiceAbsoluteAddresses.hpp
   UInt32 atxCfgValue = 0;
   status = FWA::SCANNER::safeReadQuadlet(deviceInterface, service, atxCfgAddr,
-                                         atxCfgValue, generation, true);
+                                         &atxCfgValue, generation);
   if (status == kIOReturnSuccess) {
     device.diceRegisters[atxCfgAddr] = atxCfgValue;
-    uint32_t hostValue = CFSwapInt32LittleToHost(atxCfgValue);
-    device.avsTxDataBlockSize = static_cast<uint8_t>(
+    UInt32 hostValue = CFSwapInt32LittleToHost(atxCfgValue);
+    device.avsTxDataBlockSize = static_cast<UInt8>(
         (hostValue &
          AVS_AUDIO_TRANSMITTER_CFG_DATA_BLOCK_SIZE_MASK) >> // Use constexpr
                                                             // mask
         AVS_AUDIO_TRANSMITTER_CFG_DATA_BLOCK_SIZE_SHIFT); // Use constexpr shift
-    uint32_t sysMode =
+    UInt32 sysMode =
         (hostValue &
          AVS_AUDIO_TRANSMITTER_CFG_SYS_MODE_MASK) >> // Use constexpr mask
         AVS_AUDIO_TRANSMITTER_CFG_SYS_MODE_SHIFT;    // Use constexpr shift

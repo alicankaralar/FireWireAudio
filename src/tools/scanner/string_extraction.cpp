@@ -8,12 +8,12 @@
 namespace FWA::SCANNER {
 
 std::vector<StringMatch>
-extractStringsFromMemory(const std::map<uint64_t, uint32_t> &registers,
+extractStringsFromMemory(const std::map<UInt64, UInt32> &registers,
                          DeviceEndianness endianness) {
   std::vector<StringMatch> results;
 
   // Sort registers by address
-  std::vector<std::pair<uint64_t, uint32_t>> sortedRegisters;
+  std::vector<std::pair<UInt64, UInt32>> sortedRegisters;
   for (const auto &regPair : registers) {
     sortedRegisters.push_back(regPair);
   }
@@ -21,15 +21,15 @@ extractStringsFromMemory(const std::map<uint64_t, uint32_t> &registers,
 
   // Extract quadlet-level strings
   std::string currentString;
-  uint64_t stringStartAddr = 0;
+  UInt64 stringStartAddr = 0;
   bool inString = false;
 
   for (const auto &regPair : sortedRegisters) {
-    uint64_t addr = regPair.first;
-    uint32_t rawValue = regPair.second;
+    UInt64 addr = regPair.first;
+    UInt32 rawValue = regPair.second;
 
     // Convert to host endianness based on detected device endianness
-    uint32_t hostValue = deviceToHostInt32(rawValue, endianness);
+    UInt32 hostValue = deviceToHostInt32(rawValue, endianness);
     std::string ascii = interpretAsASCII(hostValue);
 
     if (!ascii.empty()) {
@@ -66,7 +66,7 @@ extractStringsFromMemory(const std::map<uint64_t, uint32_t> &registers,
 
   // Extract byte-level strings with improved termination detection
   std::string byteString;
-  uint64_t byteStringStartAddr = 0;
+  UInt64 byteStringStartAddr = 0;
   bool inByteString = false;
 
   // Track structure information if available
@@ -79,7 +79,7 @@ extractStringsFromMemory(const std::map<uint64_t, uint32_t> &registers,
   for (const auto &regPair : sortedRegisters) {
     // Look for potential structure size indicators
     // Common sizes are 16, 32, or 64 bytes per name slot
-    uint32_t hostValue = deviceToHostInt32(regPair.second, endianness);
+    UInt32 hostValue = deviceToHostInt32(regPair.second, endianness);
     if (hostValue == 16 || hostValue == 32 || hostValue == 64) {
       // This might be a structure size indicator
       structureSize = hostValue;
@@ -91,9 +91,9 @@ extractStringsFromMemory(const std::map<uint64_t, uint32_t> &registers,
   }
 
   for (const auto &regPair : sortedRegisters) {
-    uint64_t addr = regPair.first;
-    uint32_t rawValue = regPair.second;
-    uint32_t hostValue = deviceToHostInt32(rawValue, endianness);
+    UInt64 addr = regPair.first;
+    UInt32 rawValue = regPair.second;
+    UInt32 hostValue = deviceToHostInt32(rawValue, endianness);
 
     // Extract individual bytes based on the device's endianness
     std::string bytes;
@@ -211,7 +211,7 @@ extractStringsFromMemory(const std::map<uint64_t, uint32_t> &registers,
   return results;
 }
 
-std::vector<std::string> extractPrintableStringsFromBytes(const uint8_t *bytes,
+std::vector<std::string> extractPrintableStringsFromBytes(const UInt8 *bytes,
                                                           size_t length,
                                                           size_t structureSize,
                                                           size_t minLength) {
@@ -225,7 +225,7 @@ std::vector<std::string> extractPrintableStringsFromBytes(const uint8_t *bytes,
   bool hasStructureInfo = (structureSize > 0);
 
   for (size_t i = 0; i < length; i++) {
-    uint8_t byte = bytes[i];
+    UInt8 byte = bytes[i];
 
     // Check if this is a printable ASCII character
     if (byte >= 32 && byte <= 126) {

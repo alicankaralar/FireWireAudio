@@ -15,16 +15,16 @@ namespace FWA::SCANNER {
 
 // --- Config ROM Parsing Implementation ---
 
-std::map<uint32_t, uint64_t>
+std::map<UInt32, UInt64>
 parseConfigRomVendorKeys(IOFireWireDeviceInterface **deviceInterface,
                          io_service_t service, UInt32 generation) {
   std::cerr
       << "Debug [ConfigROM]: Parsing Config ROM for Vendor Keys (0xD0-0xFF)..."
       << std::dec << std::endl;
-  const uint64_t CONFIG_ROM_BASE = 0xFFFFF0000400ULL;
+  const UInt64 CONFIG_ROM_BASE = 0xFFFFF0000400ULL;
   const size_t MAX_ROM_READ_QUADLETS = 64; // Read up to 256 bytes initially
 
-  std::map<uint32_t, uint64_t>
+  std::map<UInt32, UInt64>
       vendorKeyAddresses; // Map to store found vendor key addresses
 
   // 1. Read Bus Info Block Header (Offset 0x400) - Optional for now, assume
@@ -33,13 +33,13 @@ parseConfigRomVendorKeys(IOFireWireDeviceInterface **deviceInterface,
   // busInfoHeader, generation);
   // ... check status ...
   // busInfoHeader = CFSwapInt32BigToHost(busInfoHeader);
-  // uint32_t busInfoLength = (busInfoHeader >> 24) & 0xFF; // Usually 4
+  // UInt32 busInfoLength = (busInfoHeader >> 24) & 0xFF; // Usually 4
 
   // 2. Read Root Directory Header (Offset 0x414)
-  uint64_t rootDirHeaderAddr = CONFIG_ROM_BASE + (5 * 4); // 0xFFFFF0000414
+  UInt64 rootDirHeaderAddr = CONFIG_ROM_BASE + (5 * 4); // 0xFFFFF0000414
   UInt32 rootDirHeader = 0;
   IOReturn status = safeReadQuadlet(deviceInterface, service, rootDirHeaderAddr,
-                                    rootDirHeader, generation);
+                                    &rootDirHeader, generation);
   if (status != kIOReturnSuccess) {
     std::cerr << "Error [ConfigROM]: Failed to read Root Directory Header at 0x"
               << std::hex << rootDirHeaderAddr << " (status: " << status << ")"
@@ -52,9 +52,9 @@ parseConfigRomVendorKeys(IOFireWireDeviceInterface **deviceInterface,
             << std::endl;
 
   // 3. Extract Root Directory Length & Calculate Offset
-  uint32_t rootDirLength =
+  UInt32 rootDirLength =
       (rootDirHeader >> 16) & 0xFFFF; // Length is in upper 16 bits
-  uint64_t rootDirOffset =
+  UInt64 rootDirOffset =
       CONFIG_ROM_BASE +
       (6 * 4); // Root Dir entries start *after* the header (Offset 0x418)
 
@@ -70,12 +70,12 @@ parseConfigRomVendorKeys(IOFireWireDeviceInterface **deviceInterface,
             << " quadlets." << std::endl;
 
   // 4. Find Unit Directory Offset in Root Directory
-  uint64_t unitDirAddr = DICE_INVALID_OFFSET; // Use constexpr variable
-  for (uint32_t i = 0; i < rootDirLength; ++i) {
-    uint64_t entryAddr = rootDirOffset + (i * 4);
+  UInt64 unitDirAddr = DICE_INVALID_OFFSET; // Use constexpr variable
+  for (UInt32 i = 0; i < rootDirLength; ++i) {
+    UInt64 entryAddr = rootDirOffset + (i * 4);
     UInt32 entryValue = 0;
     IOReturn status = safeReadQuadlet(deviceInterface, service, entryAddr,
-                                      entryValue, generation);
+                                      &entryValue, generation);
     if (status != kIOReturnSuccess) {
       std::cerr << "Error [ConfigROM]: Failed to read Root Directory entry "
                 << i << " at 0x" << std::hex << entryAddr
@@ -84,8 +84,8 @@ parseConfigRomVendorKeys(IOFireWireDeviceInterface **deviceInterface,
                                  // error
     }
     entryValue = CFSwapInt32BigToHost(entryValue);
-    uint32_t key = (entryValue >> 24) & 0xFF;
-    uint32_t value =
+    UInt32 key = (entryValue >> 24) & 0xFF;
+    UInt32 value =
         entryValue & 0xFFFFFF; // Offset in quadlets relative to Config ROM Base
 
     std::cerr << "  Root Dir Entry " << i << " [0x" << std::hex << entryAddr
@@ -114,8 +114,9 @@ parseConfigRomVendorKeys(IOFireWireDeviceInterface **deviceInterface,
 
   // 5. Parse the Unit Directory to find vendor keys (0xD0 - 0xFF)
   UInt32 unitDirHeader = 0;
-  status = safeReadQuadlet(deviceInterface, service, unitDirAddr, unitDirHeader,
-                           generation); // Assign to existing status variable
+  status =
+      safeReadQuadlet(deviceInterface, service, unitDirAddr, &unitDirHeader,
+                      generation); // Assign to existing status variable
   if (status != kIOReturnSuccess) {
     std::cerr << "Error [ConfigROM]: Failed to read Unit Directory header at 0x"
               << std::hex << unitDirAddr << " (status: " << status << ")"
@@ -123,7 +124,7 @@ parseConfigRomVendorKeys(IOFireWireDeviceInterface **deviceInterface,
     return vendorKeyAddresses; // Return empty map
   }
   unitDirHeader = CFSwapInt32BigToHost(unitDirHeader);
-  uint32_t unitDirLength = unitDirHeader & 0xFFFF; // Lower 16 bits
+  UInt32 unitDirLength = unitDirHeader & 0xFFFF; // Lower 16 bits
   std::cerr << "Debug [ConfigROM]: Unit Directory Header: 0x" << std::hex
             << unitDirHeader << ", Length: " << std::dec << unitDirLength
             << " quadlets." << std::endl;
@@ -136,11 +137,11 @@ parseConfigRomVendorKeys(IOFireWireDeviceInterface **deviceInterface,
     return vendorKeyAddresses; // Return empty map
   }
 
-  uint64_t unitDirEntryOffset = unitDirAddr + 4; // Start after header
-  for (uint32_t i = 0; i < unitDirLength; ++i) {
-    uint64_t entryAddr = unitDirEntryOffset + (i * 4);
+  UInt64 unitDirEntryOffset = unitDirAddr + 4; // Start after header
+  for (UInt32 i = 0; i < unitDirLength; ++i) {
+    UInt64 entryAddr = unitDirEntryOffset + (i * 4);
     UInt32 entryValue = 0;
-    status = safeReadQuadlet(deviceInterface, service, entryAddr, entryValue,
+    status = safeReadQuadlet(deviceInterface, service, entryAddr, &entryValue,
                              generation);
     if (status != kIOReturnSuccess) {
       std::cerr << "Error [ConfigROM]: Failed to read Unit Directory entry "
@@ -149,10 +150,9 @@ parseConfigRomVendorKeys(IOFireWireDeviceInterface **deviceInterface,
       return vendorKeyAddresses; // Return potentially partially filled map
     }
     entryValue = CFSwapInt32BigToHost(entryValue);
-    uint32_t key = (entryValue >> 24) & 0xFF;
-    uint32_t value =
-        entryValue & 0xFFFFFF; // Offset relative to the start of the containing
-                               // directory (unitDirAddr)
+    UInt32 key = (entryValue >> 24) & 0xFF;
+    UInt32 value = entryValue & 0xFFFFFF; // Offset relative to the start of the
+                                          // containing directory (unitDirAddr)
 
     // More detailed logging within the Unit Directory loop
     std::cerr << "  Unit Dir Entry " << i << " [0x" << std::hex << entryAddr
@@ -184,7 +184,7 @@ parseConfigRomVendorKeys(IOFireWireDeviceInterface **deviceInterface,
 
     // Check if this entry is a vendor-specific key (0xD0 - 0xFF)
     if (key >= 0xD0 && key <= 0xFF) {
-      uint64_t absoluteAddr = unitDirAddr + (value * 4);
+      UInt64 absoluteAddr = unitDirAddr + (value * 4);
       std::cerr << "Debug [ConfigROM]: Found Vendor Specific key (0x"
                 << std::hex << key << ") pointing to offset 0x" << value
                 << " relative to Unit Dir (0x" << unitDirAddr

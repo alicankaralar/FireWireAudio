@@ -7,7 +7,7 @@
 
 namespace FWA::SCANNER {
 
-std::map<uint64_t, uint32_t>
+std::map<UInt64, UInt32>
 checkKnownStringLocations(const FireWireDevice &device) {
   std::cout << "\n=== KNOWN STRING LOCATIONS ===\n" << std::endl;
 
@@ -18,18 +18,18 @@ checkKnownStringLocations(const FireWireDevice &device) {
   }
 
   // Define known string locations from previous memory explorations
-  std::vector<std::pair<uint64_t, std::string>> knownStringAddresses = {
+  std::vector<std::pair<UInt64, std::string>> knownStringAddresses = {
       {DICE_DEVICE_NAME_ADDR, "Device Name"},
       {DICE_CHANNEL_NAMES_ADDR_2, "Channel Configuration"},
       {DICE_CHANNEL_NAMES_ADDR_1, "Output Channels"}};
 
   // Add these addresses to the device's register map for analysis
   // We'll use a temporary map to avoid modifying the original
-  std::map<uint64_t, uint32_t> tempRegisters = device.diceRegisters;
+  std::map<UInt64, UInt32> tempRegisters = device.diceRegisters;
 
   // Try to read from these known addresses
   for (const auto &addrPair : knownStringAddresses) {
-    uint64_t addr = addrPair.first;
+    UInt64 addr = addrPair.first;
     std::string description = addrPair.second;
 
     // Check if we already have this address in our register map

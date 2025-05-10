@@ -1,8 +1,8 @@
 #include "dice_base_discovery.hpp"
-#include "FWA/DiceAbsoluteAddresses.hpp" // For DICE_REGISTER_BASE, etc.
-#include "config_rom.hpp"                // For parseConfigRomVendorKeys
-#include "io_helpers.hpp"                // For safeReadQuadlet
-#include "scanner_defines.hpp"           // For FFADO constants
+#include "FWA/dice/DiceAbsoluteAddresses.hpp" // For DICE_REGISTER_BASE, etc.
+#include "FWA/dice/DiceDefines.hpp"
+#include "config_rom.hpp" // For parseConfigRomVendorKeys
+#include "io_helpers.hpp" // For safeReadQuadlet
 
 #include <iomanip> // For std::hex, std::setw, std::setfill
 #include <iostream>
@@ -21,7 +21,7 @@ bool testRegisterSpaceAccess(IOFireWireDeviceInterface **deviceInterface,
 // This is needed by channel_discovery.cpp
 bool discoverDiceBaseAddressesInternal(
     IOFireWireDeviceInterface **deviceInterface, io_service_t service,
-    UInt32 generation, uint64_t &globalBase, uint64_t &txBase, uint64_t &rxBase,
+    UInt32 generation, UInt64 &globalBase, UInt64 &txBase, UInt64 &rxBase,
     std::string &method) {
   return discoverDiceBaseAddresses(deviceInterface, service, generation,
                                    globalBase, txBase, rxBase, method);
@@ -31,8 +31,8 @@ namespace {
 // Helper function to read DICE offsets from a discovery base address
 static bool readDiceOffsets(IOFireWireDeviceInterface **deviceInterface,
                             io_service_t service, UInt32 generation,
-                            uint64_t discoveryBase, uint64_t &globalBase,
-                            uint64_t &txBase, uint64_t &rxBase) {
+                            UInt64 discoveryBase, UInt64 &globalBase,
+                            UInt64 &txBase, UInt64 &rxBase) {
   // Skip detailed pointer block description to reduce noise
 
   // Read Global space pointer (64-bit)
@@ -41,7 +41,7 @@ static bool readDiceOffsets(IOFireWireDeviceInterface **deviceInterface,
   // Read high 32 bits
   IOReturn ptrReadStatus = FWA::SCANNER::safeReadQuadlet(
       deviceInterface, service, discoveryBase + DICE_OFFSET_GLOBAL_SPACE_PTR_HI,
-      globalPtrHiBE, generation);
+      &globalPtrHiBE, generation);
 
   if (ptrReadStatus != kIOReturnSuccess) {
     std::cerr << "Error [DICE]: Failed to read Global pointer HI at 0x"
@@ -57,7 +57,7 @@ static bool readDiceOffsets(IOFireWireDeviceInterface **deviceInterface,
   // Read low 32 bits
   ptrReadStatus = FWA::SCANNER::safeReadQuadlet(
       deviceInterface, service, discoveryBase + DICE_OFFSET_GLOBAL_SPACE_PTR_LO,
-      globalPtrLoBE, generation);
+      &globalPtrLoBE, generation);
 
   if (ptrReadStatus != kIOReturnSuccess) {
     std::cerr << "Error [DICE]: Failed to read Global pointer LO at 0x"
@@ -72,7 +72,7 @@ static bool readDiceOffsets(IOFireWireDeviceInterface **deviceInterface,
   // Read high 32 bits
   ptrReadStatus = FWA::SCANNER::safeReadQuadlet(
       deviceInterface, service, discoveryBase + DICE_OFFSET_TX_SPACE_PTR_HI(0),
-      txPtrHiBE, generation);
+      &txPtrHiBE, generation);
 
   if (ptrReadStatus != kIOReturnSuccess) {
     std::cerr << "Error [DICE]: Failed to read TX[0] pointer HI at 0x"
@@ -84,7 +84,7 @@ static bool readDiceOffsets(IOFireWireDeviceInterface **deviceInterface,
   // Read low 32 bits
   ptrReadStatus = FWA::SCANNER::safeReadQuadlet(
       deviceInterface, service, discoveryBase + DICE_OFFSET_TX_SPACE_PTR_LO(0),
-      txPtrLoBE, generation);
+      &txPtrLoBE, generation);
 
   if (ptrReadStatus != kIOReturnSuccess) {
     std::cerr << "Error [DICE]: Failed to read TX[0] pointer LO at 0x"
@@ -99,7 +99,7 @@ static bool readDiceOffsets(IOFireWireDeviceInterface **deviceInterface,
   // Read high 32 bits
   ptrReadStatus = FWA::SCANNER::safeReadQuadlet(
       deviceInterface, service, discoveryBase + DICE_OFFSET_RX_SPACE_PTR_HI(0),
-      rxPtrHiBE, generation);
+      &rxPtrHiBE, generation);
 
   if (ptrReadStatus != kIOReturnSuccess) {
     std::cerr << "Error [DICE]: Failed to read RX[0] pointer HI at 0x"
@@ -111,7 +111,7 @@ static bool readDiceOffsets(IOFireWireDeviceInterface **deviceInterface,
   // Read low 32 bits
   ptrReadStatus = FWA::SCANNER::safeReadQuadlet(
       deviceInterface, service, discoveryBase + DICE_OFFSET_RX_SPACE_PTR_LO(0),
-      rxPtrLoBE, generation);
+      &rxPtrLoBE, generation);
 
   if (ptrReadStatus != kIOReturnSuccess) {
     std::cerr << "Error [DICE]: Failed to read RX[0] pointer LO at 0x"
@@ -121,18 +121,17 @@ static bool readDiceOffsets(IOFireWireDeviceInterface **deviceInterface,
   }
 
   // Convert to host endianness
-  uint32_t globalPtrHi = CFSwapInt32LittleToHost(globalPtrHiBE);
-  uint32_t globalPtrLo = CFSwapInt32LittleToHost(globalPtrLoBE);
-  uint32_t txPtrHi = CFSwapInt32LittleToHost(txPtrHiBE);
-  uint32_t txPtrLo = CFSwapInt32LittleToHost(txPtrLoBE);
-  uint32_t rxPtrHi = CFSwapInt32LittleToHost(rxPtrHiBE);
-  uint32_t rxPtrLo = CFSwapInt32LittleToHost(rxPtrLoBE);
+  UInt32 globalPtrHi = CFSwapInt32LittleToHost(globalPtrHiBE);
+  UInt32 globalPtrLo = CFSwapInt32LittleToHost(globalPtrLoBE);
+  UInt32 txPtrHi = CFSwapInt32LittleToHost(txPtrHiBE);
+  UInt32 txPtrLo = CFSwapInt32LittleToHost(txPtrLoBE);
+  UInt32 rxPtrHi = CFSwapInt32LittleToHost(rxPtrHiBE);
+  UInt32 rxPtrLo = CFSwapInt32LittleToHost(rxPtrLoBE);
 
   // Combine into 64-bit addresses
-  uint64_t rawGlobalBase =
-      (static_cast<uint64_t>(globalPtrHi) << 32) | globalPtrLo;
-  uint64_t rawTxBase = (static_cast<uint64_t>(txPtrHi) << 32) | txPtrLo;
-  uint64_t rawRxBase = (static_cast<uint64_t>(rxPtrHi) << 32) | rxPtrLo;
+  UInt64 rawGlobalBase = (static_cast<UInt64>(globalPtrHi) << 32) | globalPtrLo;
+  UInt64 rawTxBase = (static_cast<UInt64>(txPtrHi) << 32) | txPtrLo;
+  UInt64 rawRxBase = (static_cast<UInt64>(rxPtrHi) << 32) | rxPtrLo;
 
   // Log the raw values
   std::cerr << "Info [DICE]: Raw pointer values:" << std::endl;
@@ -186,8 +185,8 @@ static bool readDiceOffsets(IOFireWireDeviceInterface **deviceInterface,
 // Function to discover DICE base addresses (Global, TX, RX)
 bool discoverDiceBaseAddresses(IOFireWireDeviceInterface **deviceInterface,
                                io_service_t service, UInt32 generation,
-                               uint64_t &globalBase, uint64_t &txBase,
-                               uint64_t &rxBase, std::string &method) {
+                               UInt64 &globalBase, UInt64 &txBase,
+                               UInt64 &rxBase, std::string &method) {
   // Skip discovery process description to reduce noise
 
   globalBase = DICE_INVALID_OFFSET;
@@ -200,15 +199,15 @@ bool discoverDiceBaseAddresses(IOFireWireDeviceInterface **deviceInterface,
   // Method 1: Use Vendor Keys from Config ROM
   std::cerr << "\nInfo [DICE]: Method 1 - Checking Config ROM Vendor Keys..."
             << std::endl;
-  std::map<uint32_t, uint64_t> vendorKeys =
+  std::map<UInt32, UInt64> vendorKeys =
       parseConfigRomVendorKeys(deviceInterface, service, generation);
 
   if (!vendorKeys.empty()) {
     std::cerr << "Info [DICE]: Found " << vendorKeys.size()
               << " vendor key(s) in Config ROM to test" << std::endl;
     for (const auto &pair : vendorKeys) {
-      uint32_t key = pair.first;
-      uint64_t potentialGlobalBase = pair.second;
+      UInt32 key = pair.first;
+      UInt64 potentialGlobalBase = pair.second;
       std::cerr << "\nInfo [DICE]: Testing Vendor Key 0x" << std::hex << key
                 << " -> Potential base address 0x" << potentialGlobalBase
                 << std::dec << std::endl;
@@ -222,7 +221,7 @@ bool discoverDiceBaseAddresses(IOFireWireDeviceInterface **deviceInterface,
               deviceInterface, service,
               potentialGlobalBase +
                   (GLOBAL_OWNER_ADDR - DICE_REGISTER_BASE), // Use Owner offset
-              testValue, generation) == kIOReturnSuccess) {
+              &testValue, generation) == kIOReturnSuccess) {
         UInt32 ownerValue = CFSwapInt32LittleToHost(testValue);
         std::cerr << "Info [DICE]: Verification successful! Owner register = 0x"
                   << std::hex << ownerValue << std::dec;
@@ -285,20 +284,17 @@ bool discoverDiceBaseAddresses(IOFireWireDeviceInterface **deviceInterface,
         << "\nInfo [DICE]: Method 2 - Testing FFADO pointer discovery base..."
         << std::endl;
     std::cerr << "Info [DICE]: Using standard FFADO base address: 0x"
-              << std::hex << FWA::Scanner::FFADO_POINTER_DISCOVERY_BASE
-              << std::dec << std::endl;
+              << std::hex << DICE_REGISTER_BASE << std::dec << std::endl;
 
-    uint64_t discoveredGlobalBase = 0, discoveredTxBase = 0,
-             discoveredRxBase = 0;
+    UInt64 discoveredGlobalBase = 0, discoveredTxBase = 0, discoveredRxBase = 0;
     if (readDiceOffsets(deviceInterface, service, generation,
-                        FWA::Scanner::FFADO_POINTER_DISCOVERY_BASE,
-                        discoveredGlobalBase, discoveredTxBase,
-                        discoveredRxBase)) {
+                        DICE_REGISTER_BASE, discoveredGlobalBase,
+                        discoveredTxBase, discoveredRxBase)) {
       // Verify the discovered Global base by reading the Owner register
       if (FWA::SCANNER::safeReadQuadlet(
               deviceInterface, service,
               discoveredGlobalBase + (GLOBAL_OWNER_ADDR - DICE_REGISTER_BASE),
-              testValue, generation) == kIOReturnSuccess) {
+              &testValue, generation) == kIOReturnSuccess) {
         UInt32 ownerValue = CFSwapInt32LittleToHost(testValue);
         std::cerr << "Info [DICE]: Verification successful! Owner register = 0x"
                   << std::hex << ownerValue << std::dec;
@@ -352,7 +348,7 @@ bool discoverDiceBaseAddresses(IOFireWireDeviceInterface **deviceInterface,
                   (GLOBAL_OWNER_ADDR -
                    DICE_REGISTER_BASE), // Use Owner offset relative to absolute
                                         // base
-              testValue, generation) == kIOReturnSuccess) {
+              &testValue, generation) == kIOReturnSuccess) {
         UInt32 ownerValue = CFSwapInt32LittleToHost(testValue);
         std::cerr << "Info [DICE]: Legacy base verification successful! Owner "
                      "register = 0x"
@@ -464,14 +460,14 @@ bool testRegisterSpaceAccess(IOFireWireDeviceInterface **deviceInterface,
   std::cerr << "\nInfo [DICE]: Testing Core registers..." << std::endl;
   struct CoreRegTest {
     const char *name;
-    uint64_t addr;
+    UInt64 addr;
   } coreRegs[] = {{"Global Owner", GLOBAL_OWNER_ADDR},
                   {"TX Stream Size", TX_SZ_TX_ADDR},
                   {"RX Stream Size", RX_SZ_RX_ADDR}};
 
   for (const auto &reg : coreRegs) {
-    IOReturn status = safeReadQuadlet(deviceInterface, service, reg.addr, value,
-                                      generation, true);
+    IOReturn status =
+        safeReadQuadlet(deviceInterface, service, reg.addr, &value, generation);
     if (status == kIOReturnSuccess) {
       std::cerr << "Info [DICE]: " << reg.name
                 << " register readable (value: 0x" << std::hex << value
@@ -485,18 +481,18 @@ bool testRegisterSpaceAccess(IOFireWireDeviceInterface **deviceInterface,
 
   struct EAPSection {
     const char *name;
-    uint64_t baseAddr;
-    uint64_t size;
+    UInt64 baseAddr;
+    UInt64 size;
   } eapSections[] = {
-      {"Capability", DICE_EAP_CAPABILITY_SPACE_OFF, 0x4},
-      {"Command", DICE_EAP_CMD_SPACE_OFF, 0x8},
-      {"Mixer", DICE_EAP_MIXER_SPACE_OFF, 0x8},
-      {"Peak", DICE_EAP_PEAK_SPACE_OFF, 0x8},
-      {"New Routing", DICE_EAP_NEW_ROUTING_SPACE_OFF, 0x8},
-      {"Stream Config", DICE_EAP_NEW_STREAM_CFG_SPACE_OFF, 0x8},
-      {"Current Config", DICE_EAP_CURR_CFG_SPACE_OFF, 0x8},
-      {"Standalone Config", DICE_EAP_STAND_ALONE_CFG_SPACE_OFF, 0x8},
-      {"App", DICE_EAP_APP_SPACE_OFF, 0x8}};
+      {"Capability", DICE_EAP_CAPABILITY_SPACE_OFFSET, 0x4},
+      {"Command", DICE_EAP_CMD_SPACE_OFFSET, 0x8},
+      {"Mixer", DICE_EAP_MIXER_SPACE_OFFSET, 0x8},
+      {"Peak", DICE_EAP_PEAK_SPACE_OFFSET, 0x8},
+      {"New Routing", DICE_EAP_NEW_ROUTING_SPACE_OFFSET, 0x8},
+      {"Stream Config", DICE_EAP_NEW_STREAM_CFG_SPACE_OFFSET, 0x8},
+      {"Current Config", DICE_EAP_CURR_CFG_SPACE_OFFSET, 0x8},
+      {"Standalone Config", DICE_EAP_STAND_ALONE_CFG_SPACE_OFFSET, 0x8},
+      {"App", DICE_EAP_APP_SPACE_OFFSET, 0x8}};
 
   for (const auto &section : eapSections) {
     int successCount = 0;
@@ -506,12 +502,12 @@ bool testRegisterSpaceAccess(IOFireWireDeviceInterface **deviceInterface,
               << std::endl;
 
     // Test each quadlet in the section
-    for (uint64_t offset = 0; offset < section.size; offset += 4) {
-      uint64_t addr = DICE_EAP_BASE + section.baseAddr + offset;
+    for (UInt64 offset = 0; offset < section.size; offset += 4) {
+      UInt64 addr = DICE_EAP_BASE + section.baseAddr + offset;
       totalReads++;
 
-      IOReturn status = safeReadQuadlet(deviceInterface, service, addr, value,
-                                        generation, false);
+      IOReturn status =
+          safeReadQuadlet(deviceInterface, service, addr, &value, generation);
       if (status == kIOReturnSuccess) {
         successCount++;
         anySuccess = true;
@@ -536,14 +532,14 @@ bool testRegisterSpaceAccess(IOFireWireDeviceInterface **deviceInterface,
   std::cerr << "\nInfo [DICE]: Testing Subsystem registers..." << std::endl;
   struct SubsysRegTest {
     const char *name;
-    uint64_t addr;
+    UInt64 addr;
   } subsysRegs[] = {{"GPCSR Chip ID", GPCSR_CHIP_ID_ADDR},
                     {"Clock Controller", CLOCK_CONTROLLER_SYNC_CTRL_ADDR},
                     {"AVS Receiver", AVS_AUDIO_RECEIVER_CFG0_ADDR}};
 
   for (const auto &reg : subsysRegs) {
-    IOReturn status = safeReadQuadlet(deviceInterface, service, reg.addr, value,
-                                      generation, false);
+    IOReturn status =
+        safeReadQuadlet(deviceInterface, service, reg.addr, &value, generation);
     if (status == kIOReturnSuccess) {
       std::cerr << "Info [DICE]: " << reg.name
                 << " register readable (value: 0x" << std::hex << value

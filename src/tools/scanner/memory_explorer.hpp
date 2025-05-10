@@ -29,7 +29,7 @@ namespace FWA::SCANNER {
  */
 void exploreDiceMemoryLayout(IOFireWireDeviceInterface **deviceInterface,
                              io_service_t service, FireWireDevice &device,
-                             UInt32 generation, uint64_t baseAddr);
+                             UInt32 generation, UInt64 baseAddr);
 
 /**
  * @brief Explores specific memory areas based on the DICE datasheet memory map.
@@ -46,7 +46,7 @@ void exploreDiceMemoryLayout(IOFireWireDeviceInterface **deviceInterface,
  */
 void exploreTargetedMemoryAreas(IOFireWireDeviceInterface **deviceInterface,
                                 io_service_t service, FireWireDevice &device,
-                                UInt32 generation, uint64_t discoveredDiceBase);
+                                UInt32 generation, UInt64 discoveredDiceBase);
 
 } // namespace FWA::SCANNER
 

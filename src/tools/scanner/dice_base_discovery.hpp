@@ -30,8 +30,8 @@ namespace FWA::SCANNER {
  */
 bool discoverDiceBaseAddresses(IOFireWireDeviceInterface **deviceInterface,
                                io_service_t service, UInt32 generation,
-                               uint64_t &globalBase, uint64_t &txBase,
-                               uint64_t &rxBase, std::string &method);
+                               UInt64 &globalBase, UInt64 &txBase,
+                               UInt64 &rxBase, std::string &method);
 
 /**
  * @brief Test register access across different spaces

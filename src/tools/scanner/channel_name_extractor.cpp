@@ -14,11 +14,11 @@
 
 namespace FWA::SCANNER {
 
-std::map<uint64_t, uint32_t>
+std::map<UInt64, UInt32>
 collectChannelRegisters(IOFireWireDeviceInterface **deviceInterface,
-                        io_service_t service, uint64_t channelNamesBaseAddr,
+                        io_service_t service, UInt64 channelNamesBaseAddr,
                         UInt32 generation, int preRange, int postRange) {
-  std::map<uint64_t, uint32_t> channelRegisters;
+  std::map<UInt64, UInt32> channelRegisters;
   const int STEP = 1; // Scan every quadlet
 
   std::cout << "Scanning " << preRange * 4 << " bytes before and "
@@ -28,11 +28,11 @@ collectChannelRegisters(IOFireWireDeviceInterface **deviceInterface,
 
   // Collect all readable registers in the range
   for (int offset = -preRange; offset <= postRange; offset += STEP) {
-    uint64_t addr = channelNamesBaseAddr + (offset * 4); // 4 bytes per quadlet
+    UInt64 addr = channelNamesBaseAddr + (offset * 4); // 4 bytes per quadlet
     UInt32 value = 0;
 
     IOReturn status = FWA::SCANNER::safeReadQuadlet(deviceInterface, service,
-                                                    addr, value, generation);
+                                                    addr, &value, generation);
     if (status == kIOReturnSuccess) {
       channelRegisters[addr] = value;
     }
@@ -41,14 +41,14 @@ collectChannelRegisters(IOFireWireDeviceInterface **deviceInterface,
   return channelRegisters;
 }
 
-std::vector<uint8_t>
-processChannelRegisters(const std::map<uint64_t, uint32_t> &channelRegisters,
+std::vector<UInt8>
+processChannelRegisters(const std::map<UInt64, UInt32> &channelRegisters,
                         DeviceEndianness deviceEndianness) {
-  std::vector<uint8_t> byteArray;
+  std::vector<UInt8> byteArray;
   byteArray.reserve(channelRegisters.size() * 4); // Each register is 4 bytes
 
   // Sort registers by address to ensure correct byte order
-  std::vector<std::pair<uint64_t, uint32_t>> sortedRegisters;
+  std::vector<std::pair<UInt64, UInt32>> sortedRegisters;
   for (const auto &regPair : channelRegisters) {
     sortedRegisters.push_back(regPair);
   }
@@ -56,7 +56,7 @@ processChannelRegisters(const std::map<uint64_t, uint32_t> &channelRegisters,
 
   // Fill the byte array
   for (const auto &regPair : sortedRegisters) {
-    uint32_t hostValue = deviceToHostInt32(regPair.second, deviceEndianness);
+    UInt32 hostValue = deviceToHostInt32(regPair.second, deviceEndianness);
 
     // Add bytes in the correct order based on endianness
     if (deviceEndianness == DeviceEndianness::DEVICE_BIG_ENDIAN) {
@@ -127,7 +127,7 @@ extractChannelNames(IOFireWireDeviceInterface **deviceInterface,
   // Dynamically discover the channel names address
   // This function now prioritizes NAMES_BASE pointers from stream registers and
   // EAP structures
-  uint64_t channelNamesBaseAddr =
+  UInt64 channelNamesBaseAddr =
       discoverChannelNamesAddress(deviceInterface, service, generation);
 
   // Store the discovered channel names address in the device structure for
@@ -137,7 +137,7 @@ extractChannelNames(IOFireWireDeviceInterface **deviceInterface,
             << channelNamesBaseAddr << std::dec << std::endl;
 
   // Collect all readable registers in the range
-  std::map<uint64_t, uint32_t> channelRegisters = collectChannelRegisters(
+  std::map<UInt64, UInt32> channelRegisters = collectChannelRegisters(
       deviceInterface, service, channelNamesBaseAddr, generation);
 
   if (channelRegisters.empty()) {
@@ -150,7 +150,7 @@ extractChannelNames(IOFireWireDeviceInterface **deviceInterface,
             << " readable registers in the channel names area." << std::endl;
 
   // Convert the register map to a byte array for structure-aware parsing
-  std::vector<uint8_t> byteArray =
+  std::vector<UInt8> byteArray =
       processChannelRegisters(channelRegisters, deviceEndianness);
 
   // Try to determine if there's a structure size for channel names
@@ -162,7 +162,7 @@ extractChannelNames(IOFireWireDeviceInterface **deviceInterface,
   if (device.txStreamCount > 0 || device.rxStreamCount > 0) {
     // Look for potential structure size indicators in the device's registers
     for (const auto &regPair : device.diceRegisters) {
-      uint32_t hostValue = deviceToHostInt32(regPair.second, deviceEndianness);
+      UInt32 hostValue = deviceToHostInt32(regPair.second, deviceEndianness);
       if (hostValue == 16 || hostValue == 32 || hostValue == 64) {
         // This might be a structure size indicator
         structureSize = hostValue;

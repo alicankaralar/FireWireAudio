@@ -44,7 +44,7 @@ detectDeviceEndianness(IOFireWireDeviceInterface **deviceInterface,
  * @param endianness The device's endianness
  * @return The value converted to host endianness
  */
-uint32_t deviceToHostInt32(uint32_t value, DeviceEndianness endianness);
+UInt32 deviceToHostInt32(UInt32 value, DeviceEndianness endianness);
 
 /**
  * @brief Converts a 32-bit value from host endianness to device endianness
@@ -53,7 +53,20 @@ uint32_t deviceToHostInt32(uint32_t value, DeviceEndianness endianness);
  * @param endianness The device's endianness
  * @return The value converted to device endianness
  */
-uint32_t hostToDeviceInt32(uint32_t value, DeviceEndianness endianness);
+UInt32 hostToDeviceInt32(UInt32 value, DeviceEndianness endianness);
+
+/**
+ * @brief Converts an array of quadlets from FireWire bus endianness to host
+ * endianness
+ *
+ * This function performs in-place conversion of the provided array, swapping
+ * bytes as needed based on the host machine's endianness. FireWire bus data is
+ * always big-endian.
+ *
+ * @param data Pointer to the array of quadlets to convert
+ * @param length Number of quadlets (not bytes) in the array
+ */
+void byteSwapFromBus(UInt32 *data, size_t length);
 
 } // namespace FWA::SCANNER
 

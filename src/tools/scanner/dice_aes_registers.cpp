@@ -1,6 +1,6 @@
 #include "dice_aes_registers.hpp"
-#include "FWA/DiceAbsoluteAddresses.hpp" // For DICE_REGISTER_BASE, etc.
-#include "endianness_helpers.hpp"        // For deviceToHostInt32
+#include "FWA/dice/DiceAbsoluteAddresses.hpp" // For DICE_REGISTER_BASE, etc.
+#include "endianness_helpers.hpp"             // For deviceToHostInt32
 #include "io_helpers.hpp" // For safeReadQuadlet, interpretAsASCII
 #include "scanner.hpp"    // For FireWireDevice, DiceDefines.hpp constants
 
@@ -15,22 +15,21 @@
 namespace FWA::SCANNER {
 void readAesReceiverRegisters(IOFireWireDeviceInterface **deviceInterface,
                               io_service_t service, FireWireDevice &device,
-                              uint64_t /* discoveredDiceBase */,
+                              UInt64 /* discoveredDiceBase */,
                               UInt32 generation) {
   std::cerr << "Debug [DICE]: Reading AES Receiver registers using absolute "
                "addresses..."
             << std::endl;
 
   // Read STAT_ALL
-  uint64_t statAllAddr =
-      AES_RECEIVER_STAT_ALL_ADDR; // Use absolute address from
-                                  // DiceAbsoluteAddresses.hpp
+  UInt64 statAllAddr = AES_RECEIVER_STAT_ALL_ADDR; // Use absolute address from
+                                                   // DiceAbsoluteAddresses.hpp
   UInt32 statAllValue = 0;
   IOReturn status = FWA::SCANNER::safeReadQuadlet(
-      deviceInterface, service, statAllAddr, statAllValue, generation, true);
+      deviceInterface, service, statAllAddr, &statAllValue, generation);
   if (status == kIOReturnSuccess) {
     device.diceRegisters[statAllAddr] = statAllValue;
-    uint32_t hostValue = CFSwapInt32LittleToHost(statAllValue);
+    UInt32 hostValue = CFSwapInt32LittleToHost(statAllValue);
     device.aesLocked =
         (hostValue & AES_RECEIVER_STAT_ALL_LOCK_BIT) != 0; // Use constexpr mask
     std::cerr << "Debug [DICE]: Read AES_RECEIVER_STAT_ALL (0x" << std::hex

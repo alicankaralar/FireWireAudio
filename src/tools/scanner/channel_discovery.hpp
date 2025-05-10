@@ -21,9 +21,8 @@ namespace FWA::SCANNER {
  * @param generation The current bus generation number
  * @return The discovered address, or a default fallback if none is found
  */
-uint64_t
-discoverChannelNamesAddress(IOFireWireDeviceInterface **deviceInterface,
-                            io_service_t service, UInt32 generation);
+UInt64 discoverChannelNamesAddress(IOFireWireDeviceInterface **deviceInterface,
+                                   io_service_t service, UInt32 generation);
 
 } // namespace FWA::SCANNER
 

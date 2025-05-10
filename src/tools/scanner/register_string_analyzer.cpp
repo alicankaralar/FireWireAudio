@@ -3,7 +3,10 @@
 #include "register_known_locations.hpp"
 #include "register_name_analyzer.hpp"
 
+#include <cstdint>
 #include <iostream>
+#include <map>
+#include <string>
 
 namespace FWA::SCANNER {
 
@@ -17,8 +20,7 @@ void extractCoherentRegisterStrings(const FireWireDevice &device) {
   }
 
   // Step 1: Check known string locations
-  std::map<uint64_t, uint32_t> tempRegisters =
-      checkKnownStringLocations(device);
+  std::map<UInt64, UInt32> tempRegisters = checkKnownStringLocations(device);
 
   // Step 2: Group registers by address range
   std::vector<RegisterAddressRange> ranges =

@@ -20,19 +20,15 @@ bool readDiceEAPCapabilities(IOFireWireDeviceInterface **deviceInterface,
 
   // Use the discovered DICE base address if available, otherwise fall back to
   // standard base
-  uint64_t diceBaseForEAPOffsetRead =
-      (device.diceGlobalBase != DICE_INVALID_OFFSET) ? device.diceGlobalBase
-                                                     : DICE_REGISTER_BASE;
-
   std::cerr << "Debug [DICE EAP]: Using DICE base address: 0x" << std::hex
-            << diceBaseForEAPOffsetRead << std::dec << std::endl;
+            << DICE_REGISTER_BASE << std::dec << std::endl;
 
   // 1. Read the EAP Capability Space Offset
-  uint64_t eapCapOffsetAddr = DICE_EAP_CAPABILITY_SPACE_ADDR;
+  UInt64 eapCapOffsetAddr = DICE_EAP_CAPABILITY_SPACE_ADDR;
   UInt32 eapCapOffsetQuadlets = 0;
   IOReturn status =
       FWA::SCANNER::safeReadQuadlet(deviceInterface, service, eapCapOffsetAddr,
-                                    eapCapOffsetQuadlets, generation);
+                                    &eapCapOffsetQuadlets, generation);
 
   if (status != kIOReturnSuccess) {
     std::cerr << "Warning [DICE EAP]: Failed to read EAP capability space "
@@ -40,22 +36,12 @@ bool readDiceEAPCapabilities(IOFireWireDeviceInterface **deviceInterface,
               << status << "). EAP may not be supported." << std::endl;
     return false;
   }
-  // The actual EAP space base address is relative to the *device's* DICE base
-  // (which might differ) We need the discovered base here. For now, assume
-  // standard base.
-  // TODO: Pass discoveredDiceBase into this function if it can differ.
-  uint64_t eapCapBaseAddr =
-      diceBaseForEAPOffsetRead +
-      (eapCapOffsetQuadlets * 4); // Convert quadlets to bytes
-  std::cerr << "Debug [DICE EAP]: EAP Capability Space Base Address: 0x"
-            << std::hex << eapCapBaseAddr << std::dec << std::endl;
 
   // 2. Read the General Capability Register from the EAP space
-  uint64_t generalCapAddr = eapCapBaseAddr + (DICE_EAP_CAPABILITY_GENERAL -
-                                              DICE_EAP_CAPABILITY_SPACE_OFF);
+  UInt64 generalCapAddr = DICE_EAP_CAPABILITY_SPACE_ADDR;
   UInt32 generalCapValue = 0;
   status = FWA::SCANNER::safeReadQuadlet(
-      deviceInterface, service, generalCapAddr, generalCapValue, generation);
+      deviceInterface, service, generalCapAddr, &generalCapValue, generation);
 
   if (status != kIOReturnSuccess) {
     std::cerr << "Warning [DICE EAP]: Failed to read EAP General Capability "
@@ -73,14 +59,14 @@ bool readDiceEAPCapabilities(IOFireWireDeviceInterface **deviceInterface,
 
   std::cerr << "Debug [DICE EAP]: Read EAP General Capability: 0x" << std::hex
             << generalCapValue << std::dec << std::endl;
-  // Chip type logging happens in the calling function (readDiceRegisters)
 
   // 4. Read Router Capability Register
-  uint64_t routerCapAddr = eapCapBaseAddr + (DICE_EAP_CAPABILITY_ROUTER -
-                                             DICE_EAP_CAPABILITY_SPACE_OFF);
+  UInt64 routerCapAddr =
+      DICE_EAP_CAPABILITY_SPACE_ADDR +
+      (DICE_EAP_CAPABILITY_ROUTER_OFFSET - DICE_EAP_CAPABILITY_SPACE_OFFSET);
   UInt32 routerCapValue = 0;
   status = FWA::SCANNER::safeReadQuadlet(
-      deviceInterface, service, routerCapAddr, routerCapValue, generation);
+      deviceInterface, service, routerCapAddr, &routerCapValue, generation);
   if (status == kIOReturnSuccess) {
     device.diceRegisters[routerCapAddr] = routerCapValue;
     std::cerr << "Debug [DICE EAP]: Read EAP Router Capability: 0x" << std::hex
@@ -92,11 +78,12 @@ bool readDiceEAPCapabilities(IOFireWireDeviceInterface **deviceInterface,
   }
 
   // 5. Read Mixer Capability Register
-  uint64_t mixerCapAddr = eapCapBaseAddr + (DICE_EAP_CAPABILITY_MIXER -
-                                            DICE_EAP_CAPABILITY_SPACE_OFF);
+  UInt64 mixerCapAddr =
+      DICE_EAP_CAPABILITY_SPACE_ADDR +
+      (DICE_EAP_CAPABILITY_MIXER_OFFSET - DICE_EAP_CAPABILITY_SPACE_OFFSET);
   UInt32 mixerCapValue = 0;
   status = FWA::SCANNER::safeReadQuadlet(deviceInterface, service, mixerCapAddr,
-                                         mixerCapValue, generation);
+                                         &mixerCapValue, generation);
   if (status == kIOReturnSuccess) {
     device.diceRegisters[mixerCapAddr] = mixerCapValue;
     std::cerr << "Debug [DICE EAP]: Read EAP Mixer Capability: 0x" << std::hex
@@ -119,7 +106,7 @@ bool readDiceEAPCurrentConfig(IOFireWireDeviceInterface **deviceInterface,
 
   // Use the discovered DICE base address if available, otherwise fall back to
   // standard base
-  uint64_t diceBaseForEAPOffsetRead =
+  UInt64 diceBaseForEAPOffsetRead =
       (device.diceGlobalBase != DICE_INVALID_OFFSET) ? device.diceGlobalBase
                                                      : DICE_REGISTER_BASE;
 
@@ -127,10 +114,10 @@ bool readDiceEAPCurrentConfig(IOFireWireDeviceInterface **deviceInterface,
             << diceBaseForEAPOffsetRead << std::dec << std::endl;
 
   // 1. Read the EAP Current Config Space Offset
-  uint64_t eapCurrCfgOffsetAddr = DICE_EAP_CURR_CFG_SPACE_ADDR;
+  UInt64 eapCurrCfgOffsetAddr = DICE_EAP_CURR_CFG_SPACE_ADDR;
   UInt32 eapCurrCfgOffsetQuadlets = 0;
   IOReturn status = FWA::SCANNER::safeReadQuadlet(
-      deviceInterface, service, eapCurrCfgOffsetAddr, eapCurrCfgOffsetQuadlets,
+      deviceInterface, service, eapCurrCfgOffsetAddr, &eapCurrCfgOffsetQuadlets,
       generation);
 
   if (status != kIOReturnSuccess) {
@@ -140,7 +127,7 @@ bool readDiceEAPCurrentConfig(IOFireWireDeviceInterface **deviceInterface,
     return false;
   }
   // TODO: Pass discoveredDiceBase into this function if it can differ.
-  uint64_t eapCurrCfgBaseAddr =
+  UInt64 eapCurrCfgBaseAddr =
       diceBaseForEAPOffsetRead +
       (eapCurrCfgOffsetQuadlets * 4); // Convert quadlets to bytes
   std::cerr << "Debug [DICE EAP]: EAP Current Config Space Base Address: 0x"
@@ -149,20 +136,20 @@ bool readDiceEAPCurrentConfig(IOFireWireDeviceInterface **deviceInterface,
   // Determine which config block to read based on current sample rate (if
   // known) For now, just try reading the LOW config block as an example
   // TODO: Read sample rate first and select appropriate block (LOW/MID/HIGH)
-  uint64_t configBlockBase =
+  UInt64 configBlockBase =
       eapCurrCfgBaseAddr +
-      (DICE_EAP_CURRCFG_LOW_STREAM -
-       DICE_EAP_CURR_CFG_SPACE_OFF); // Example: Low rate stream config
+      (DICE_EAP_CURRCFG_LOW_STREAM_OFFSET -
+       DICE_EAP_CURR_CFG_SPACE_OFFSET); // Example: Low rate stream config
   device.currentConfig =
       DiceConfig::Low; // Assume Low for now - Note: DiceConfig is an enum, not
                        // a macro, so namespace is correct here.
 
   // Read number of TX streams from the config block
-  uint64_t txCountAddr =
+  UInt64 txCountAddr =
       configBlockBase + 0; // Offset 0 within stream config block for TX count
   UInt32 txCountValue = 0;
   status = FWA::SCANNER::safeReadQuadlet(deviceInterface, service, txCountAddr,
-                                         txCountValue, generation);
+                                         &txCountValue, generation);
   if (status == kIOReturnSuccess) {
     // Apply sanity check/limit
     if (txCountValue > 64) {
@@ -185,11 +172,11 @@ bool readDiceEAPCurrentConfig(IOFireWireDeviceInterface **deviceInterface,
   }
 
   // Read number of RX streams from the config block
-  uint64_t rxCountAddr =
+  UInt64 rxCountAddr =
       configBlockBase + 4; // Offset 4 within stream config block for RX count
   UInt32 rxCountValue = 0;
   status = FWA::SCANNER::safeReadQuadlet(deviceInterface, service, rxCountAddr,
-                                         rxCountValue, generation);
+                                         &rxCountValue, generation);
   if (status == kIOReturnSuccess) {
     if (rxCountValue > 64) {
       std::cerr << "Warning [DICE EAP]: RX stream count " << rxCountValue
@@ -214,19 +201,19 @@ bool readDiceEAPCurrentConfig(IOFireWireDeviceInterface **deviceInterface,
   const int MAX_STREAMS_TO_CHECK = 8; // Limit to a reasonable number
 
   // Check for channel name pointers in LOW, MID, and HIGH configurations
-  std::vector<uint64_t> configBlocks = {
+  std::vector<UInt64> configBlocks = {
       eapCurrCfgBaseAddr +
-          (DICE_EAP_CURRCFG_LOW_STREAM - DICE_EAP_CURR_CFG_SPACE_OFF),
+          (DICE_EAP_CURRCFG_LOW_STREAM_OFFSET - DICE_EAP_CURR_CFG_SPACE_OFFSET),
       eapCurrCfgBaseAddr +
-          (DICE_EAP_CURRCFG_MID_STREAM - DICE_EAP_CURR_CFG_SPACE_OFF),
-      eapCurrCfgBaseAddr +
-          (DICE_EAP_CURRCFG_HIGH_STREAM - DICE_EAP_CURR_CFG_SPACE_OFF)};
+          (DICE_EAP_CURRCFG_MID_STREAM_OFFSET - DICE_EAP_CURR_CFG_SPACE_OFFSET),
+      eapCurrCfgBaseAddr + (DICE_EAP_CURRCFG_HIGH_STREAM_OFFSET -
+                            DICE_EAP_CURR_CFG_SPACE_OFFSET)};
 
-  for (uint64_t blockBase : configBlocks) {
+  for (UInt64 blockBase : configBlocks) {
     // Skip to next block if we can't read the TX count
-    uint64_t txCountAddr = blockBase + 0;
+    UInt64 txCountAddr = blockBase + 0;
     UInt32 txCount = 0;
-    if (safeReadQuadlet(deviceInterface, service, txCountAddr, txCount,
+    if (safeReadQuadlet(deviceInterface, service, txCountAddr, &txCount,
                         generation) != kIOReturnSuccess) {
       continue;
     }
@@ -239,25 +226,25 @@ bool readDiceEAPCurrentConfig(IOFireWireDeviceInterface **deviceInterface,
       // The stream configuration structure has a variable layout
       // We'll check several offsets that might contain a channel names pointer
       for (int offset = 8; offset < 32; offset += 4) {
-        uint64_t potentialPtrAddr =
+        UInt64 potentialPtrAddr =
             blockBase + 8 + (i * 32) +
             offset; // 8 bytes for header, 32 bytes per stream
         UInt32 potentialPtr = 0;
 
         if (safeReadQuadlet(deviceInterface, service, potentialPtrAddr,
-                            potentialPtr, generation) == kIOReturnSuccess) {
+                            &potentialPtr, generation) == kIOReturnSuccess) {
           // Check if this looks like a valid pointer (non-zero and within
           // reasonable range)
           UInt32 swappedValue = CFSwapInt32LittleToHost(potentialPtr);
           if (swappedValue != 0 &&
               swappedValue < 0x100000) { // Reasonable quadlet offset
-            uint64_t channelNamesAddr =
+            UInt64 channelNamesAddr =
                 diceBaseForEAPOffsetRead + (swappedValue * 4);
 
             // Verify if this points to valid channel names
             UInt32 testValue = 0;
             if (safeReadQuadlet(deviceInterface, service, channelNamesAddr,
-                                testValue, generation) == kIOReturnSuccess) {
+                                &testValue, generation) == kIOReturnSuccess) {
               std::string ascii =
                   interpretAsASCII(CFSwapInt32LittleToHost(testValue));
               if (!ascii.empty() && (ascii.find("OUT") != std::string::npos ||

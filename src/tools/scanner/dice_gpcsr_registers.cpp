@@ -1,6 +1,6 @@
 #include "dice_gpcsr_registers.hpp"
-#include "FWA/DiceAbsoluteAddresses.hpp" // For DICE_REGISTER_BASE, etc.
-#include "endianness_helpers.hpp"        // For deviceToHostInt32
+#include "FWA/dice/DiceAbsoluteAddresses.hpp" // For DICE_REGISTER_BASE, etc.
+#include "endianness_helpers.hpp"             // For deviceToHostInt32
 #include "io_helpers.hpp" // For safeReadQuadlet, interpretAsASCII
 #include "scanner.hpp"    // For FireWireDevice, DiceDefines.hpp constants
 
@@ -15,34 +15,32 @@
 namespace FWA::SCANNER {
 void readGpcsrRegisters(IOFireWireDeviceInterface **deviceInterface,
                         io_service_t service, FireWireDevice &device,
-                        uint64_t /* discoveredDiceBase */, UInt32 generation) {
+                        UInt64 /* discoveredDiceBase */, UInt32 generation) {
   std::cerr
       << "Debug [DICE]: Reading GPCSR registers using absolute addresses..."
       << std::endl;
 
   // Read GPCSR_CHIP_ID
-  uint64_t chipIdAddr =
-      GPCSR_CHIP_ID_ADDR; // Use absolute address from DiceAbsoluteAddresses.hpp
+  UInt64 chipIdAddr = GPCSR_CHIP_ID_ADDR;
   UInt32 chipIdValue = 0;
   IOReturn status = FWA::SCANNER::safeReadQuadlet(
-      deviceInterface, service, chipIdAddr, chipIdValue, generation, true);
+      deviceInterface, service, chipIdAddr, &chipIdValue, generation);
   if (status == kIOReturnSuccess) {
     device.diceRegisters[chipIdAddr] = chipIdValue;
-    uint32_t hostValue = CFSwapInt32LittleToHost(chipIdValue);
-    uint32_t chipType =
-        (hostValue & GPCSR_CHIP_ID_CHIP_TYPE_MASK) >> // Use constexpr mask
-        GPCSR_CHIP_ID_CHIP_TYPE_SHIFT;                // Use constexpr shift
+    UInt32 hostValue = CFSwapInt32LittleToHost(chipIdValue);
+    UInt32 chipType = (hostValue & GPCSR_CHIP_ID_CHIP_TYPE_MASK) >>
+                      GPCSR_CHIP_ID_CHIP_TYPE_SHIFT;
 
     switch (chipType) {
-    case static_cast<uint32_t>(DiceChipType::DiceII):
+    case static_cast<UInt32>(DiceChipType::DiceII):
       device.diceChipType = DiceChipType::DiceII;
       std::cerr << "Debug [DICE]: Detected Chip Type: DICE II" << std::endl;
       break;
-    case static_cast<uint32_t>(DiceChipType::DiceMini):
+    case static_cast<UInt32>(DiceChipType::DiceMini):
       device.diceChipType = DiceChipType::DiceMini;
       std::cerr << "Debug [DICE]: Detected Chip Type: DICE Mini" << std::endl;
       break;
-    case static_cast<uint32_t>(DiceChipType::DiceJr):
+    case static_cast<UInt32>(DiceChipType::DiceJr):
       device.diceChipType = DiceChipType::DiceJr;
       std::cerr << "Debug [DICE]: Detected Chip Type: DICE Jr" << std::endl;
       break;
@@ -59,16 +57,14 @@ void readGpcsrRegisters(IOFireWireDeviceInterface **deviceInterface,
   }
 
   // Read GPCSR_AUDIO_SELECT
-  uint64_t audioSelectAddr =
-      GPCSR_AUDIO_SELECT_ADDR; // Use absolute address from
-                               // DiceAbsoluteAddresses.hpp
+  UInt64 audioSelectAddr = GPCSR_AUDIO_SELECT_ADDR;
+
   UInt32 audioSelectValue = 0;
-  status =
-      FWA::SCANNER::safeReadQuadlet(deviceInterface, service, audioSelectAddr,
-                                    audioSelectValue, generation, true);
+  status = FWA::SCANNER::safeReadQuadlet(
+      deviceInterface, service, audioSelectAddr, &audioSelectValue, generation);
   if (status == kIOReturnSuccess) {
     device.diceRegisters[audioSelectAddr] = audioSelectValue;
-    uint32_t hostValue = CFSwapInt32LittleToHost(audioSelectValue);
+    UInt32 hostValue = CFSwapInt32LittleToHost(audioSelectValue);
     std::cerr << "Debug [DICE]: Read GPCSR_AUDIO_SELECT (0x" << std::hex
               << audioSelectAddr << "): 0x" << hostValue << std::dec
               << std::endl;

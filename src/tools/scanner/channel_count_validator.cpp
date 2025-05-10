@@ -1,6 +1,7 @@
 #include "channel_count_validator.hpp"
-#include "dice_helpers.hpp" // For DICE register constants
-#include "scanner.hpp"      // For FireWireDevice
+#include "dice_base_discovery.hpp"   // For DICE_INVALID_OFFSET
+#include "dice_register_readers.hpp" // For DICE register constants
+#include "scanner.hpp"               // For FireWireDevice
 
 #include <algorithm> // For std::max
 #include <cmath>     // For std::abs
@@ -31,26 +32,27 @@ void calculateStreamChannelCounts(const FireWireDevice &device,
   }
 
   // Iterate through TX streams
-  for (uint32_t i = 0; i < device.txStreamCount; ++i) {
+  for (UInt32 i = 0; i < device.txStreamCount; ++i) {
     // Calculate the address for NB_AUDIO register for this stream
     // This is a simplified approach - in a real implementation, we would need
     // to know the stream size For now, we'll assume a fixed stream size of 256
     // quadlets (1024 bytes)
-    const uint32_t assumedStreamSizeQuadlets = 256;
-    uint64_t streamInstanceOffsetBytes = i * assumedStreamSizeQuadlets * 4;
+    const UInt32 assumedStreamSizeQuadlets = 256;
+    UInt64 streamInstanceOffsetBytes = i * assumedStreamSizeQuadlets * 4;
 
     // Calculate the address for NB_AUDIO register
-    uint64_t nbAudioAddr =
+    UInt64 nbAudioAddr =
         device.diceTxBase + streamInstanceOffsetBytes +
-        (DICE_REGISTER_TX_NB_AUDIO_BASE - DICE_REGISTER_TX_BASE);
+        (DICE_REGISTER_TX_NUMBER_AUDIO_BASE_OFFSET - DICE_REGISTER_TX_BASE);
 
     // Calculate the address for NB_MIDI register
-    uint64_t nbMidiAddr = device.diceTxBase + streamInstanceOffsetBytes +
-                          (DICE_REGISTER_TX_MIDI_BASE - DICE_REGISTER_TX_BASE);
+    UInt64 nbMidiAddr =
+        device.diceTxBase + streamInstanceOffsetBytes +
+        (DICE_REGISTER_TX_MIDI_BASE_OFFSET - DICE_REGISTER_TX_BASE);
 
     // Check if we have these registers in the device.diceRegisters map
     if (device.diceRegisters.count(nbAudioAddr)) {
-      uint32_t nbAudio =
+      UInt32 nbAudio =
           CFSwapInt32LittleToHost(device.diceRegisters.at(nbAudioAddr));
 
       // Validate the value
@@ -65,7 +67,7 @@ void calculateStreamChannelCounts(const FireWireDevice &device,
     }
 
     if (device.diceRegisters.count(nbMidiAddr)) {
-      uint32_t nbMidi =
+      UInt32 nbMidi =
           CFSwapInt32LittleToHost(device.diceRegisters.at(nbMidiAddr));
 
       // Validate the value
@@ -79,26 +81,27 @@ void calculateStreamChannelCounts(const FireWireDevice &device,
   }
 
   // Iterate through RX streams
-  for (uint32_t i = 0; i < device.rxStreamCount; ++i) {
+  for (UInt32 i = 0; i < device.rxStreamCount; ++i) {
     // Calculate the address for NB_AUDIO register for this stream
     // This is a simplified approach - in a real implementation, we would need
     // to know the stream size For now, we'll assume a fixed stream size of 256
     // quadlets (1024 bytes)
-    const uint32_t assumedStreamSizeQuadlets = 256;
-    uint64_t streamInstanceOffsetBytes = i * assumedStreamSizeQuadlets * 4;
+    const UInt32 assumedStreamSizeQuadlets = 256;
+    UInt64 streamInstanceOffsetBytes = i * assumedStreamSizeQuadlets * 4;
 
     // Calculate the address for NB_AUDIO register
-    uint64_t nbAudioAddr =
+    UInt64 nbAudioAddr =
         device.diceRxBase + streamInstanceOffsetBytes +
-        (DICE_REGISTER_RX_NB_AUDIO_BASE - DICE_REGISTER_RX_BASE);
+        (DICE_REGISTER_RX_NUMBER_AUDIO_BASE_OFFSET - DICE_REGISTER_RX_BASE);
 
     // Calculate the address for NB_MIDI register
-    uint64_t nbMidiAddr = device.diceRxBase + streamInstanceOffsetBytes +
-                          (DICE_REGISTER_RX_MIDI_BASE - DICE_REGISTER_RX_BASE);
+    UInt64 nbMidiAddr =
+        device.diceRxBase + streamInstanceOffsetBytes +
+        (DICE_REGISTER_RX_MIDI_BASE_OFFSET - DICE_REGISTER_RX_BASE);
 
     // Check if we have these registers in the device.diceRegisters map
     if (device.diceRegisters.count(nbAudioAddr)) {
-      uint32_t nbAudio =
+      UInt32 nbAudio =
           CFSwapInt32LittleToHost(device.diceRegisters.at(nbAudioAddr));
 
       // Validate the value
@@ -113,7 +116,7 @@ void calculateStreamChannelCounts(const FireWireDevice &device,
     }
 
     if (device.diceRegisters.count(nbMidiAddr)) {
-      uint32_t nbMidi =
+      UInt32 nbMidi =
           CFSwapInt32LittleToHost(device.diceRegisters.at(nbMidiAddr));
 
       // Validate the value

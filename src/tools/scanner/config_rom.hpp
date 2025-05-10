@@ -39,7 +39,7 @@ namespace FWA::SCANNER
  * found, and values are the corresponding absolute 64-bit addresses they point
  * to. Returns an empty map if no vendor keys are found or if errors occur.
  */
-std::map<uint32_t, uint64_t>
+std::map<UInt32, UInt64>
 parseConfigRomVendorKeys(IOFireWireDeviceInterface **deviceInterface,
                          io_service_t service, UInt32 generation);
 

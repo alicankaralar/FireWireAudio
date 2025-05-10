@@ -16,7 +16,7 @@ namespace FWA::SCANNER {
 
 void exploreDiceMemoryLayout(IOFireWireDeviceInterface **deviceInterface,
                              io_service_t service, FireWireDevice &device,
-                             UInt32 generation, uint64_t baseAddr) {
+                             UInt32 generation, UInt64 baseAddr) {
   std::cerr << "Debug [Utils]: Exploring memory around address 0x" << std::hex
             << baseAddr << std::dec << "..." << std::endl;
 
@@ -27,7 +27,7 @@ void exploreDiceMemoryLayout(IOFireWireDeviceInterface **deviceInterface,
   // Special case for exploring around the output channel names
   if (baseAddr == DICE_REGISTER_BASE) {
     // Check if we're specifically looking at the output channel names area
-    uint64_t channelNamesAddr = DICE_CHANNEL_NAMES_ADDR_1;
+    UInt64 channelNamesAddr = DICE_CHANNEL_NAMES_ADDR_1;
     if (channelNamesAddr >= baseAddr - EXPLORE_RANGE * 4 &&
         channelNamesAddr <= baseAddr + EXPLORE_RANGE * 4) {
       // Extend the range to capture more channel names
@@ -46,21 +46,21 @@ void exploreDiceMemoryLayout(IOFireWireDeviceInterface **deviceInterface,
   std::cerr << "\n--- Potential Version Registers ---" << std::endl;
   for (int offset = -EXPLORE_RANGE; offset <= EXPLORE_RANGE;
        offset += EXPLORE_STEP) {
-    uint64_t testAddr = baseAddr + offset * 4; // 4 bytes per quadlet
+    UInt64 testAddr = baseAddr + offset * 4; // 4 bytes per quadlet
     UInt32 value = 0;
 
     IOReturn status = FWA::SCANNER::safeReadQuadlet(
-        deviceInterface, service, testAddr, value, generation);
+        deviceInterface, service, testAddr, &value, generation);
     if (status == kIOReturnSuccess) {
       // Check if this could be a version register (typically in format A.B.C.D
       // where each is a byte) A valid version is usually something like 1.0.7.0
       // or similar
-      uint32_t swappedValue =
+      UInt32 swappedValue =
           CFSwapInt32LittleToHost(value); // DICE uses Little Endian
-      uint8_t versionA = DICE_DRIVER_SPEC_VERSION_NUMBER_GET_A(swappedValue);
-      uint8_t versionB = DICE_DRIVER_SPEC_VERSION_NUMBER_GET_B(swappedValue);
-      uint8_t versionC = DICE_DRIVER_SPEC_VERSION_NUMBER_GET_C(swappedValue);
-      uint8_t versionD = DICE_DRIVER_SPEC_VERSION_NUMBER_GET_D(swappedValue);
+      UInt8 versionA = DICE_DRIVER_SPEC_VERSION_NUMBER_GET_A(swappedValue);
+      UInt8 versionB = DICE_DRIVER_SPEC_VERSION_NUMBER_GET_B(swappedValue);
+      UInt8 versionC = DICE_DRIVER_SPEC_VERSION_NUMBER_GET_C(swappedValue);
+      UInt8 versionD = DICE_DRIVER_SPEC_VERSION_NUMBER_GET_D(swappedValue);
 
       std::string ascii = FWA::SCANNER::interpretAsASCII(swappedValue);
       // Heuristic: Version numbers usually small, D often 0
@@ -89,18 +89,18 @@ void exploreDiceMemoryLayout(IOFireWireDeviceInterface **deviceInterface,
   // Look for an area with coherent string data (channel names)
   std::cerr << "\n--- Potential String Data ---" << std::endl;
   std::string currentString;
-  uint64_t stringStartAddr = 0;
+  UInt64 stringStartAddr = 0;
   bool inString = false;
 
   for (int offset = -EXPLORE_RANGE; offset <= EXPLORE_RANGE;
        offset += EXPLORE_STEP) {
-    uint64_t testAddr = baseAddr + offset * 4;
+    UInt64 testAddr = baseAddr + offset * 4;
     UInt32 value = 0;
     IOReturn status = FWA::SCANNER::safeReadQuadlet(
-        deviceInterface, service, testAddr, value, generation);
+        deviceInterface, service, testAddr, &value, generation);
 
     if (status == kIOReturnSuccess) {
-      uint32_t swappedValue = CFSwapInt32LittleToHost(value);
+      UInt32 swappedValue = CFSwapInt32LittleToHost(value);
       std::string ascii = FWA::SCANNER::interpretAsASCII(swappedValue);
       bool hasPrintable = false;
       for (char c : ascii) {
@@ -146,13 +146,13 @@ void exploreDiceMemoryLayout(IOFireWireDeviceInterface **deviceInterface,
   // Look for structured numeric data (e.g., consecutive zeros, patterns)
   std::cerr << "\n--- Potential Structured Data (Zero Blocks) ---" << std::endl;
   int zeroCount = 0;
-  uint64_t zeroStartAddr = 0;
+  UInt64 zeroStartAddr = 0;
   for (int offset = -EXPLORE_RANGE; offset <= EXPLORE_RANGE;
        offset += EXPLORE_STEP) {
-    uint64_t testAddr = baseAddr + offset * 4;
+    UInt64 testAddr = baseAddr + offset * 4;
     UInt32 value = 0;
     IOReturn status = FWA::SCANNER::safeReadQuadlet(
-        deviceInterface, service, testAddr, value, generation);
+        deviceInterface, service, testAddr, &value, generation);
 
     if (status == kIOReturnSuccess) {
       if (value == 0) { // Check raw Big Endian value for zero
@@ -187,16 +187,15 @@ void exploreDiceMemoryLayout(IOFireWireDeviceInterface **deviceInterface,
 
 void exploreTargetedMemoryAreas(IOFireWireDeviceInterface **deviceInterface,
                                 io_service_t service, FireWireDevice &device,
-                                UInt32 generation,
-                                uint64_t discoveredDiceBase) {
+                                UInt32 generation, UInt64 discoveredDiceBase) {
   std::cerr << "Debug [Utils]: Exploring targeted memory areas..." << std::endl;
 
   // Explore key functional blocks based on datasheet memory map
   // Using discoveredDiceBase if available, otherwise falling back to hardcoded
   // DICE_REGISTER_BASE
-  uint64_t baseToUse = (discoveredDiceBase != DICE_INVALID_OFFSET)
-                           ? discoveredDiceBase
-                           : DICE_REGISTER_BASE;
+  UInt64 baseToUse = (discoveredDiceBase != DICE_INVALID_OFFSET)
+                         ? discoveredDiceBase
+                         : DICE_REGISTER_BASE;
 
   std::cerr << "\n--- Exploring GPCSR Area (0xC700_0000) ---" << std::endl;
   exploreDiceMemoryLayout(deviceInterface, service, device, generation,

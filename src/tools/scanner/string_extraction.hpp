@@ -14,7 +14,7 @@ namespace FWA::SCANNER {
  */
 struct StringMatch {
   std::string text; ///< The extracted string text
-  uint64_t address; ///< The memory address where the string was found
+  UInt64 address;   ///< The memory address where the string was found
   bool isByteLevel; ///< Whether the string was found at the byte level or
                     ///< quadlet level
 };
@@ -31,7 +31,7 @@ struct StringMatch {
  * @return Vector of StringMatch objects containing the extracted strings
  */
 std::vector<StringMatch> extractStringsFromMemory(
-    const std::map<uint64_t, uint32_t> &registers,
+    const std::map<UInt64, UInt32> &registers,
     DeviceEndianness endianness = DeviceEndianness::UNKNOWN_ENDIAN);
 
 /**
@@ -52,7 +52,7 @@ std::vector<StringMatch> extractStringsFromMemory(
  * @return Vector of extracted strings
  */
 std::vector<std::string>
-extractPrintableStringsFromBytes(const uint8_t *bytes, size_t length,
+extractPrintableStringsFromBytes(const UInt8 *bytes, size_t length,
                                  size_t structureSize = 0,
                                  size_t minLength = 3);
 

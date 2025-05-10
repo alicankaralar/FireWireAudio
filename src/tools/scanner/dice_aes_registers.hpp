@@ -24,7 +24,7 @@ namespace FWA::SCANNER {
  */
 void readAesReceiverRegisters(IOFireWireDeviceInterface **deviceInterface,
                               io_service_t service, FireWireDevice &device,
-                              uint64_t globalBase, UInt32 generation);
+                              UInt64 globalBase, UInt32 generation);
 
 } // namespace FWA::SCANNER
 

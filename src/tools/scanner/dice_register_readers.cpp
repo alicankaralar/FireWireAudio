@@ -11,21 +11,20 @@
 namespace FWA::SCANNER {
 void readAllDiceRegisters(IOFireWireDeviceInterface **deviceInterface,
                           io_service_t service, FireWireDevice &device,
-                          uint64_t globalBase, UInt32 generation) {
+                          UInt64 globalBase, UInt32 generation) {
   std::cerr << "Debug [DICE]: Reading all DICE registers..." << std::endl;
 
   // Call each specialized register reader function
   readDiceGlobalRegisters(deviceInterface, service, device, globalBase,
                           generation);
-  readGpcsrRegisters(deviceInterface, service, device, globalBase, generation);
-  readClockControllerRegisters(deviceInterface, service, device, globalBase,
-                               generation);
-  readAesReceiverRegisters(deviceInterface, service, device, globalBase,
-                           generation);
-  readAudioMixerRegisters(deviceInterface, service, device, globalBase,
-                          generation);
-  readAvsRegisters(deviceInterface, service, device, globalBase, generation);
-
+  /*
+          readGpcsrRegisters(deviceInterface, service, device, globalBase,
+     generation); readClockControllerRegisters(deviceInterface, service, device,
+     globalBase, generation); readAesReceiverRegisters(deviceInterface, service,
+     device, globalBase, generation); readAudioMixerRegisters(deviceInterface,
+     service, device, globalBase, generation); readAvsRegisters(deviceInterface,
+     service, device, globalBase, generation);
+   */
   std::cerr << "Debug [DICE]: Finished reading all DICE registers."
             << std::endl;
 }

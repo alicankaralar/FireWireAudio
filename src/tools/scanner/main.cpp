@@ -48,13 +48,13 @@ int main(int argc, char *argv[]) {
     std::cout << "No FireWire devices found." << std::endl;
   } else {
     std::cout << "Found " << devices.size() << " device(s):" << std::endl;
-    for (const auto &device : devices) {
-      // Use printDeviceInfo from utils.cpp
-      FWA::SCANNER::printDeviceInfo(device);
+    // for (const auto &device : devices) {
+    //   // Use printDeviceInfo from utils.cpp
+    //   FWA::SCANNER::printDeviceInfo(device);
 
-      // Extract coherent ASCII strings from registers
-      FWA::SCANNER::extractCoherentRegisterStrings(device);
-    }
+    //   // Extract coherent ASCII strings from registers
+    //   FWA::SCANNER::extractCoherentRegisterStrings(device);
+    // }
   }
 
   std::cout << "===========================================" << std::endl;

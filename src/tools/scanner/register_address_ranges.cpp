@@ -10,11 +10,11 @@
 namespace FWA::SCANNER {
 
 std::vector<RegisterAddressRange>
-groupRegistersByAddressRange(const std::map<uint64_t, uint32_t> &registers) {
+groupRegistersByAddressRange(const std::map<UInt64, UInt32> &registers) {
   std::vector<RegisterAddressRange> addressRanges;
 
   // Sort registers by address for sequential processing
-  std::vector<std::pair<uint64_t, uint32_t>> sortedRegisters;
+  std::vector<std::pair<UInt64, UInt32>> sortedRegisters;
   for (const auto &regPair : registers) {
     sortedRegisters.push_back(regPair);
   }
@@ -25,8 +25,8 @@ groupRegistersByAddressRange(const std::map<uint64_t, uint32_t> &registers) {
   currentRange.baseAddress = 0;
 
   for (size_t i = 0; i < sortedRegisters.size(); i++) {
-    uint64_t addr = sortedRegisters[i].first;
-    uint32_t value = sortedRegisters[i].second;
+    UInt64 addr = sortedRegisters[i].first;
+    UInt32 value = sortedRegisters[i].second;
 
     if (currentRange.registers.empty() ||
         addr - currentRange.registers.back().first <= 16) {
@@ -58,7 +58,7 @@ void processAddressRangesForStrings(
     const std::vector<RegisterAddressRange> &ranges) {
   // Process each address range for coherent strings
   for (const auto &range : ranges) {
-    uint64_t baseAddr = range.baseAddress;
+    UInt64 baseAddr = range.baseAddress;
     const auto &registers = range.registers;
 
     // Skip very small groups
@@ -71,13 +71,13 @@ void processAddressRangesForStrings(
 
     // Extract strings from this range
     std::string currentString;
-    uint64_t stringStartAddr = 0;
+    UInt64 stringStartAddr = 0;
     bool inString = false;
 
     for (const auto &reg : registers) {
-      uint64_t addr = reg.first;
-      uint32_t rawValue = reg.second;
-      uint32_t hostValue =
+      UInt64 addr = reg.first;
+      UInt32 rawValue = reg.second;
+      UInt32 hostValue =
           CFSwapInt32LittleToHost(rawValue); // Convert to host endianness
       std::string ascii = interpretAsASCII(hostValue);
 
@@ -123,16 +123,16 @@ void processAddressRangesForStrings(
 
     // Also look for patterns where ASCII is split across registers
     std::string combinedAscii;
-    uint64_t combinedStartAddr = 0;
+    UInt64 combinedStartAddr = 0;
     bool inCombinedString = false;
 
     for (size_t i = 0; i < registers.size(); i++) {
-      uint64_t addr = registers[i].first;
-      uint32_t rawValue = registers[i].second;
-      uint32_t hostValue = CFSwapInt32LittleToHost(rawValue);
+      UInt64 addr = registers[i].first;
+      UInt32 rawValue = registers[i].second;
+      UInt32 hostValue = CFSwapInt32LittleToHost(rawValue);
 
       // Try both byte orders for better string detection
-      uint32_t swappedValue = CFSwapInt32BigToHost(rawValue);
+      UInt32 swappedValue = CFSwapInt32BigToHost(rawValue);
 
       // Extract individual bytes and check if they form ASCII when combined
       // Try both byte orders for better string detection

@@ -28,9 +28,9 @@ namespace FWA::SCANNER {
  * @param postRange Number of quadlets to scan after the base address
  * @return Map of register addresses to register values
  */
-std::map<uint64_t, uint32_t>
+std::map<UInt64, UInt32>
 collectChannelRegisters(IOFireWireDeviceInterface **deviceInterface,
-                        io_service_t service, uint64_t channelNamesBaseAddr,
+                        io_service_t service, UInt64 channelNamesBaseAddr,
                         UInt32 generation, int preRange = 256,
                         int postRange = 1024);
 
@@ -44,8 +44,8 @@ collectChannelRegisters(IOFireWireDeviceInterface **deviceInterface,
  * @param deviceEndianness The detected endianness of the device
  * @return Vector of bytes representing the register contents
  */
-std::vector<uint8_t>
-processChannelRegisters(const std::map<uint64_t, uint32_t> &registers,
+std::vector<UInt8>
+processChannelRegisters(const std::map<UInt64, UInt32> &registers,
                         DeviceEndianness deviceEndianness);
 
 /**

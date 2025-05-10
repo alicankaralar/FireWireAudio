@@ -1,5 +1,6 @@
 #include "dice_stream_registers.hpp"
-#include "dice_helpers.hpp"       // For DICE_REGISTER constants
+#include "dice_base_discovery.hpp"   // For base address constants
+#include "dice_register_readers.hpp" // For DICE_REGISTER constants
 #include "endianness_helpers.hpp" // For detectDeviceEndianness, deviceToHostInt32
 #include "io_helpers.hpp"         // For safeReadQuadlet, interpretAsASCII
 #include "scanner.hpp" // For FireWireDevice, DiceDefines.hpp constants
@@ -16,8 +17,8 @@ namespace FWA::SCANNER {
 // Helper to read TX stream parameters using the stream count from device
 void readDiceTxStreamRegisters(IOFireWireDeviceInterface **deviceInterface,
                                io_service_t service, FireWireDevice &device,
-                               uint64_t discoveredDiceBase, UInt32 generation,
-                               uint32_t txStreamSizeQuadlets) {
+                               UInt64 discoveredDiceBase, UInt32 generation,
+                               UInt32 txStreamSizeQuadlets) {
   // Skip if invalid size or stream count
   if (txStreamSizeQuadlets == 0) {
     std::cerr << "Debug [DICE]: Skipping TX stream register read (invalid size="
@@ -36,9 +37,9 @@ void readDiceTxStreamRegisters(IOFireWireDeviceInterface **deviceInterface,
             << device.txStreamCount << std::endl;
 
   // Find TX Parameter Space Offset (needs to be read first)
-  uint64_t txParamSpaceOffsetAddr =
-      discoveredDiceBase + DICE_REGISTER_TX_PAR_SPACE_OFF;
-  uint32_t txParamSpaceOffsetQuadlets = 0;
+  UInt64 txParamSpaceOffsetAddr =
+      discoveredDiceBase + DICE_REGISTER_TX_PARAMETER_SPACE_OFFSET;
+  UInt32 txParamSpaceOffsetQuadlets = 0;
   if (device.diceRegisters.count(txParamSpaceOffsetAddr)) {
     txParamSpaceOffsetQuadlets = deviceToHostInt32(
         device.diceRegisters[txParamSpaceOffsetAddr], device.deviceEndianness);
@@ -48,26 +49,29 @@ void readDiceTxStreamRegisters(IOFireWireDeviceInterface **deviceInterface,
               << std::endl;
     return;
   }
-  uint64_t txParamSpaceBase =
+  UInt64 txParamSpaceBase =
       discoveredDiceBase + (txParamSpaceOffsetQuadlets * 4);
   std::cerr << "Debug [DICE]: TX Parameter Space Base Address: 0x" << std::hex
             << txParamSpaceBase << std::dec << std::endl;
 
   // Define all registers to read for streams
-  std::map<uint64_t, std::string> allTxStreamRegs = {
-      {DICE_REGISTER_TX_ISOC_BASE - DICE_REGISTER_TX_BASE, "ISOC"},
-      {DICE_REGISTER_TX_NB_AUDIO_BASE - DICE_REGISTER_TX_BASE,
+  std::map<UInt64, std::string> allTxStreamRegs = {
+      {DICE_REGISTER_TX_ISOCHRONOUS_BASE_OFFSET - DICE_REGISTER_TX_BASE,
+       "ISOCHRONOUS"},
+      {DICE_REGISTER_TX_NUMBER_AUDIO_BASE_OFFSET - DICE_REGISTER_TX_BASE,
        "Audio Channels"},
-      {DICE_REGISTER_TX_MIDI_BASE - DICE_REGISTER_TX_BASE, "MIDI"},
-      {DICE_REGISTER_TX_SPEED_BASE - DICE_REGISTER_TX_BASE, "Speed"},
-      {DICE_REGISTER_TX_NAMES_BASE - DICE_REGISTER_TX_BASE, "Names Base"},
-      {DICE_REGISTER_TX_AC3_CAPABILITIES_BASE - DICE_REGISTER_TX_BASE,
+      {DICE_REGISTER_TX_MIDI_BASE_OFFSET - DICE_REGISTER_TX_BASE, "MIDI"},
+      {DICE_REGISTER_TX_SPEED_BASE_OFFSET - DICE_REGISTER_TX_BASE, "Speed"},
+      {DICE_REGISTER_TX_NAMES_BASE_OFFSET - DICE_REGISTER_TX_BASE,
+       "Names Base"},
+      {DICE_REGISTER_TX_AC3_CAPABILITIES_BASE_OFFSET - DICE_REGISTER_TX_BASE,
        "AC3 Capabilities"},
-      {DICE_REGISTER_TX_AC3_ENABLE_BASE - DICE_REGISTER_TX_BASE, "AC3 Enable"}};
+      {DICE_REGISTER_TX_AC3_ENABLE_BASE_OFFSET - DICE_REGISTER_TX_BASE,
+       "AC3 Enable"}};
 
   // Read registers for each stream based on the reported count
-  for (uint32_t i = 0; i < device.txStreamCount; ++i) {
-    uint64_t streamInstanceOffsetBytes = i * txStreamSizeQuadlets * 4;
+  for (UInt32 i = 0; i < device.txStreamCount; ++i) {
+    UInt64 streamInstanceOffsetBytes = i * txStreamSizeQuadlets * 4;
 
     // Reduced logging - only log at higher level
     if (logger_)
@@ -75,14 +79,14 @@ void readDiceTxStreamRegisters(IOFireWireDeviceInterface **deviceInterface,
 
     // Read all registers for this stream
     for (const auto &regPair : allTxStreamRegs) {
-      uint64_t regRelativeOffset = regPair.first;
+      UInt64 regRelativeOffset = regPair.first;
       const std::string &regName = regPair.second;
-      uint64_t fullAddr =
+      UInt64 fullAddr =
           txParamSpaceBase + streamInstanceOffsetBytes + regRelativeOffset;
       UInt32 value = 0;
 
       IOReturn status = FWA::SCANNER::safeReadQuadlet(
-          deviceInterface, service, fullAddr, value, generation);
+          deviceInterface, service, fullAddr, &value, generation);
       if (status == kIOReturnSuccess) {
         // Successfully read this register
         device.diceRegisters[fullAddr] = value; // Store raw BE value
@@ -102,13 +106,13 @@ void readDiceTxStreamRegisters(IOFireWireDeviceInterface **deviceInterface,
                          swappedValue);
 
         // Validate register content based on register type
-        if (regName == "ISOC") {
-          // ISOC register: Check if value is between 0-63 (inclusive)
+        if (regName == "ISOCHRONOUS") {
+          // ISOCHRONOUS register: Check if value is between 0-63 (inclusive)
           if (swappedValue > 63 &&
               swappedValue !=
                   0xFFFFFFFF) // 0xFFFFFFFF might be used as "unassigned"
           {
-            std::cerr << "Warning [DICE]: TX[" << i << "] ISOC value ("
+            std::cerr << "Warning [DICE]: TX[" << i << "] ISOCHRONOUS value ("
                       << swappedValue << ") is outside valid range (0-63)"
                       << std::endl;
           }
@@ -155,8 +159,8 @@ void readDiceTxStreamRegisters(IOFireWireDeviceInterface **deviceInterface,
                       << ") seems implausible" << std::endl;
           } else {
             // Convert quadlet offset to absolute address
-            uint64_t channelNamesAddr =
-                discoveredDiceBase + (static_cast<uint64_t>(swappedValue) * 4);
+            UInt64 channelNamesAddr =
+                discoveredDiceBase + (static_cast<UInt64>(swappedValue) * 4);
             std::cerr << "Info [DICE]: TX[" << i << "] Names Base points to 0x"
                       << std::hex << channelNamesAddr << std::dec << std::endl;
 
@@ -186,8 +190,8 @@ void readDiceTxStreamRegisters(IOFireWireDeviceInterface **deviceInterface,
 // Helper to read RX stream parameters using the stream count from device
 void readDiceRxStreamRegisters(IOFireWireDeviceInterface **deviceInterface,
                                io_service_t service, FireWireDevice &device,
-                               uint64_t discoveredDiceBase, UInt32 generation,
-                               uint32_t rxStreamSizeQuadlets) {
+                               UInt64 discoveredDiceBase, UInt32 generation,
+                               UInt32 rxStreamSizeQuadlets) {
   // Skip if invalid size or stream count
   if (rxStreamSizeQuadlets == 0) {
     std::cerr << "Debug [DICE]: Skipping RX stream register read (invalid size="
@@ -206,9 +210,9 @@ void readDiceRxStreamRegisters(IOFireWireDeviceInterface **deviceInterface,
             << device.rxStreamCount << std::endl;
 
   // Find RX Parameter Space Offset (needs to be read first)
-  uint64_t rxParamSpaceOffsetAddr =
-      discoveredDiceBase + DICE_REGISTER_RX_PAR_SPACE_OFF;
-  uint32_t rxParamSpaceOffsetQuadlets = 0;
+  UInt64 rxParamSpaceOffsetAddr =
+      discoveredDiceBase + DICE_REGISTER_RX_PARAMETER_SPACE_OFFSET;
+  UInt32 rxParamSpaceOffsetQuadlets = 0;
   if (device.diceRegisters.count(rxParamSpaceOffsetAddr)) {
     rxParamSpaceOffsetQuadlets = deviceToHostInt32(
         device.diceRegisters[rxParamSpaceOffsetAddr], device.deviceEndianness);
@@ -218,27 +222,30 @@ void readDiceRxStreamRegisters(IOFireWireDeviceInterface **deviceInterface,
               << std::endl;
     return;
   }
-  uint64_t rxParamSpaceBase =
+  UInt64 rxParamSpaceBase =
       discoveredDiceBase + (rxParamSpaceOffsetQuadlets * 4);
   std::cerr << "Debug [DICE]: RX Parameter Space Base Address: 0x" << std::hex
             << rxParamSpaceBase << std::dec << std::endl;
 
   // Define all registers to read for streams
-  std::map<uint64_t, std::string> allRxStreamRegs = {
-      {DICE_REGISTER_RX_ISOC_BASE - DICE_REGISTER_RX_BASE, "ISOC"},
-      {DICE_REGISTER_RX_SEQ_START_BASE - DICE_REGISTER_RX_BASE,
+  std::map<UInt64, std::string> allRxStreamRegs = {
+      {DICE_REGISTER_RX_ISOCHRONOUS_BASE_OFFSET - DICE_REGISTER_RX_BASE,
+       "ISOCHRONOUS"},
+      {DICE_REGISTER_RX_SEQ_START_BASE_OFFSET - DICE_REGISTER_RX_BASE,
        "Sequence Start"},
-      {DICE_REGISTER_RX_NB_AUDIO_BASE - DICE_REGISTER_RX_BASE,
+      {DICE_REGISTER_RX_NUMBER_AUDIO_BASE_OFFSET - DICE_REGISTER_RX_BASE,
        "Audio Channels"},
-      {DICE_REGISTER_RX_MIDI_BASE - DICE_REGISTER_RX_BASE, "MIDI"},
-      {DICE_REGISTER_RX_NAMES_BASE - DICE_REGISTER_RX_BASE, "Names Base"},
-      {DICE_REGISTER_RX_AC3_CAPABILITIES_BASE - DICE_REGISTER_RX_BASE,
+      {DICE_REGISTER_RX_MIDI_BASE_OFFSET - DICE_REGISTER_RX_BASE, "MIDI"},
+      {DICE_REGISTER_RX_NAMES_BASE_OFFSET - DICE_REGISTER_RX_BASE,
+       "Names Base"},
+      {DICE_REGISTER_RX_AC3_CAPABILITIES_BASE_OFFSET - DICE_REGISTER_RX_BASE,
        "AC3 Capabilities"},
-      {DICE_REGISTER_RX_AC3_ENABLE_BASE - DICE_REGISTER_RX_BASE, "AC3 Enable"}};
+      {DICE_REGISTER_RX_AC3_ENABLE_BASE_OFFSET - DICE_REGISTER_RX_BASE,
+       "AC3 Enable"}};
 
   // Read registers for each stream based on the reported count
-  for (uint32_t i = 0; i < device.rxStreamCount; ++i) {
-    uint64_t streamInstanceOffsetBytes = i * rxStreamSizeQuadlets * 4;
+  for (UInt32 i = 0; i < device.rxStreamCount; ++i) {
+    UInt64 streamInstanceOffsetBytes = i * rxStreamSizeQuadlets * 4;
 
     // Reduced logging - only log at higher level
     if (logger_)
@@ -246,14 +253,14 @@ void readDiceRxStreamRegisters(IOFireWireDeviceInterface **deviceInterface,
 
     // Read all registers for this stream
     for (const auto &regPair : allRxStreamRegs) {
-      uint64_t regRelativeOffset = regPair.first;
+      UInt64 regRelativeOffset = regPair.first;
       const std::string &regName = regPair.second;
-      uint64_t fullAddr =
+      UInt64 fullAddr =
           rxParamSpaceBase + streamInstanceOffsetBytes + regRelativeOffset;
       UInt32 value = 0;
 
       IOReturn status = FWA::SCANNER::safeReadQuadlet(
-          deviceInterface, service, fullAddr, value, generation);
+          deviceInterface, service, fullAddr, &value, generation);
       if (status == kIOReturnSuccess) {
         // Successfully read this register
         device.diceRegisters[fullAddr] = value; // Store raw BE value
@@ -273,13 +280,13 @@ void readDiceRxStreamRegisters(IOFireWireDeviceInterface **deviceInterface,
                          swappedValue);
 
         // Validate register content based on register type
-        if (regName == "ISOC") {
-          // ISOC register: Check if value is between 0-63 (inclusive)
+        if (regName == "ISOCHRONOUS") {
+          // ISOCHRONOUS register: Check if value is between 0-63 (inclusive)
           if (swappedValue > 63 &&
               swappedValue !=
                   0xFFFFFFFF) // 0xFFFFFFFF might be used as "unassigned"
           {
-            std::cerr << "Warning [DICE]: RX[" << i << "] ISOC value ("
+            std::cerr << "Warning [DICE]: RX[" << i << "] ISOCHRONOUS value ("
                       << swappedValue << ") is outside valid range (0-63)"
                       << std::endl;
           }
@@ -316,8 +323,8 @@ void readDiceRxStreamRegisters(IOFireWireDeviceInterface **deviceInterface,
                       << ") seems implausible" << std::endl;
           } else {
             // Convert quadlet offset to absolute address
-            uint64_t channelNamesAddr =
-                discoveredDiceBase + (static_cast<uint64_t>(swappedValue) * 4);
+            UInt64 channelNamesAddr =
+                discoveredDiceBase + (static_cast<UInt64>(swappedValue) * 4);
             std::cerr << "Info [DICE]: RX[" << i << "] Names Base points to 0x"
                       << std::hex << channelNamesAddr << std::dec << std::endl;
 

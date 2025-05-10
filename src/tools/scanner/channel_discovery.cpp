@@ -1,8 +1,8 @@
 #include "channel_discovery.hpp"
+#include "FWA/dice/DiceDefines.hpp"
 #include "endianness_helpers.hpp" // For detectDeviceEndianness, deviceToHostInt32
 #include "io_helpers.hpp"         // For safeReadQuadlet
-#include "scanner.hpp"         // For FireWireDevice, DiceDefines.hpp constants
-#include "scanner_defines.hpp" // For DICE_REL_OFFSET constants
+#include "scanner.hpp" // For FireWireDevice, DiceDefines.hpp constants
 #include "string_extraction.hpp" // For StringMatch, extractStringsFromMemory
 
 #include <iomanip> // For std::hex, std::dec
@@ -13,15 +13,13 @@
 #include <CoreFoundation/CoreFoundation.h> // For CFSwapInt32LittleToHost
 
 namespace FWA::SCANNER {
-// Forward declaration of internal function from dice_helpers.cpp
 bool discoverDiceBaseAddressesInternal(
     IOFireWireDeviceInterface **deviceInterface, io_service_t service,
-    UInt32 generation, uint64_t &globalBase, uint64_t &txBase, uint64_t &rxBase,
+    UInt32 generation, UInt64 &globalBase, UInt64 &txBase, UInt64 &rxBase,
     std::string &method);
 
-uint64_t
-discoverChannelNamesAddress(IOFireWireDeviceInterface **deviceInterface,
-                            io_service_t service, UInt32 generation) {
+UInt64 discoverChannelNamesAddress(IOFireWireDeviceInterface **deviceInterface,
+                                   io_service_t service, UInt32 generation) {
   std::cerr << "Debug [Utils]: Attempting to discover channel names address..."
             << std::endl;
 
@@ -40,15 +38,14 @@ discoverChannelNamesAddress(IOFireWireDeviceInterface **deviceInterface,
             << std::endl;
 
   // Step 1: Check for NAMES_BASE pointers from TX/RX stream registers
-  std::vector<uint64_t> namesBasePointers;
+  std::vector<UInt64> namesBasePointers;
 
   // First, try to get the DICE base addresses
-  uint64_t globalBase = DICE_INVALID_OFFSET;
-  uint64_t txBase = DICE_INVALID_OFFSET;
-  uint64_t rxBase = DICE_INVALID_OFFSET;
+  UInt64 globalBase = DICE_INVALID_OFFSET;
+  UInt64 txBase = DICE_INVALID_OFFSET;
+  UInt64 rxBase = DICE_INVALID_OFFSET;
   std::string method;
 
-  // Use the same discovery logic as in dice_helpers.cpp
   if (FWA::SCANNER::discoverDiceBaseAddressesInternal(deviceInterface, service,
                                                       generation, globalBase,
                                                       txBase, rxBase, method)) {
@@ -56,23 +53,23 @@ discoverChannelNamesAddress(IOFireWireDeviceInterface **deviceInterface,
               << method << std::endl;
 
     // Read TX stream count and size
-    uint32_t txStreamCount = 0;
-    uint32_t txStreamSizeQuadlets = 256; // Default size
+    UInt32 txStreamCount = 0;
+    UInt32 txStreamSizeQuadlets = 256; // Default size
 
     // Read TX stream count
     if (txBase != DICE_INVALID_OFFSET) {
-      uint64_t txCountAddr = txBase + FWA::Scanner::DICE_REL_OFFSET_TX_NB_TX;
+      UInt64 txCountAddr = txBase + DICE_REGISTER_TX_NUMBER_TX_OFFSET;
       UInt32 rawTxCount = 0;
-      if (safeReadQuadlet(deviceInterface, service, txCountAddr, rawTxCount,
+      if (safeReadQuadlet(deviceInterface, service, txCountAddr, &rawTxCount,
                           generation) == kIOReturnSuccess) {
         txStreamCount = deviceToHostInt32(rawTxCount, deviceEndianness);
         std::cerr << "Debug [Utils]: Found " << txStreamCount << " TX streams"
                   << std::endl;
 
         // Read TX stream size
-        uint64_t txSizeAddr = txBase + FWA::Scanner::DICE_REL_OFFSET_TX_SZ_TX;
+        UInt64 txSizeAddr = txBase + DICE_REGISTER_TX_SIZE_TX_OFFSET;
         UInt32 rawTxSize = 0;
-        if (safeReadQuadlet(deviceInterface, service, txSizeAddr, rawTxSize,
+        if (safeReadQuadlet(deviceInterface, service, txSizeAddr, &rawTxSize,
                             generation) == kIOReturnSuccess) {
           txStreamSizeQuadlets = deviceToHostInt32(rawTxSize, deviceEndianness);
           std::cerr << "Debug [Utils]: TX stream size: " << txStreamSizeQuadlets
@@ -81,33 +78,32 @@ discoverChannelNamesAddress(IOFireWireDeviceInterface **deviceInterface,
       }
 
       // Read TX Parameter Space Offset
-      uint64_t txParamSpaceOffsetAddr =
-          globalBase + DICE_REGISTER_TX_PAR_SPACE_OFF;
+      UInt64 txParamSpaceOffsetAddr =
+          globalBase + DICE_REGISTER_TX_PARAMETER_SPACE_OFFSET;
       UInt32 txParamSpaceOffsetQuadlets = 0;
       if (safeReadQuadlet(deviceInterface, service, txParamSpaceOffsetAddr,
-                          txParamSpaceOffsetQuadlets,
+                          &txParamSpaceOffsetQuadlets,
                           generation) == kIOReturnSuccess) {
         txParamSpaceOffsetQuadlets =
             deviceToHostInt32(txParamSpaceOffsetQuadlets, deviceEndianness);
-        uint64_t txParamSpaceBase =
-            globalBase + (txParamSpaceOffsetQuadlets * 4);
+        UInt64 txParamSpaceBase = globalBase + (txParamSpaceOffsetQuadlets * 4);
 
         // Check each TX stream for NAMES_BASE
-        for (uint32_t i = 0; i < txStreamCount && i < 8;
+        for (UInt32 i = 0; i < txStreamCount && i < 8;
              i++) // Limit to 8 streams for safety
         {
-          uint64_t streamInstanceOffsetBytes = i * txStreamSizeQuadlets * 4;
-          uint64_t namesBaseAddr = txParamSpaceBase +
-                                   streamInstanceOffsetBytes +
-                                   DICE_REGISTER_TX_NAMES_BASE;
+          UInt64 streamInstanceOffsetBytes = i * txStreamSizeQuadlets * 4;
+          UInt64 namesBaseAddr = txParamSpaceBase + streamInstanceOffsetBytes +
+                                 DICE_REGISTER_TX_NAMES_BASE_OFFSET;
 
           UInt32 namesBaseValue = 0;
           if (safeReadQuadlet(deviceInterface, service, namesBaseAddr,
-                              namesBaseValue, generation) == kIOReturnSuccess) {
-            uint32_t namesBaseOffset = CFSwapInt32LittleToHost(namesBaseValue);
+                              &namesBaseValue,
+                              generation) == kIOReturnSuccess) {
+            UInt32 namesBaseOffset = CFSwapInt32LittleToHost(namesBaseValue);
             if (namesBaseOffset != 0) {
               // Convert quadlet offset to absolute address
-              uint64_t channelNamesAddr = globalBase + (namesBaseOffset * 4);
+              UInt64 channelNamesAddr = globalBase + (namesBaseOffset * 4);
               std::cerr << "Debug [Utils]: Found TX[" << i
                         << "] NAMES_BASE pointer: 0x" << std::hex
                         << channelNamesAddr << std::dec << std::endl;
@@ -119,23 +115,23 @@ discoverChannelNamesAddress(IOFireWireDeviceInterface **deviceInterface,
     }
 
     // Read RX stream count and size
-    uint32_t rxStreamCount = 0;
-    uint32_t rxStreamSizeQuadlets = 256; // Default size
+    UInt32 rxStreamCount = 0;
+    UInt32 rxStreamSizeQuadlets = 256; // Default size
 
     // Read RX stream count
     if (rxBase != DICE_INVALID_OFFSET) {
-      uint64_t rxCountAddr = rxBase + FWA::Scanner::DICE_REL_OFFSET_RX_NB_RX;
+      UInt64 rxCountAddr = rxBase + DICE_REGISTER_TX_NUMBER_TX_OFFSET;
       UInt32 rawRxCount = 0;
-      if (safeReadQuadlet(deviceInterface, service, rxCountAddr, rawRxCount,
+      if (safeReadQuadlet(deviceInterface, service, rxCountAddr, &rawRxCount,
                           generation) == kIOReturnSuccess) {
         rxStreamCount = deviceToHostInt32(rawRxCount, deviceEndianness);
         std::cerr << "Debug [Utils]: Found " << rxStreamCount << " RX streams"
                   << std::endl;
 
         // Read RX stream size
-        uint64_t rxSizeAddr = rxBase + FWA::Scanner::DICE_REL_OFFSET_RX_SZ_RX;
+        UInt64 rxSizeAddr = rxBase + DICE_REGISTER_TX_SIZE_TX_OFFSET;
         UInt32 rawRxSize = 0;
-        if (safeReadQuadlet(deviceInterface, service, rxSizeAddr, rawRxSize,
+        if (safeReadQuadlet(deviceInterface, service, rxSizeAddr, &rawRxSize,
                             generation) == kIOReturnSuccess) {
           rxStreamSizeQuadlets = CFSwapInt32LittleToHost(rawRxSize);
           std::cerr << "Debug [Utils]: RX stream size: " << rxStreamSizeQuadlets
@@ -144,33 +140,32 @@ discoverChannelNamesAddress(IOFireWireDeviceInterface **deviceInterface,
       }
 
       // Read RX Parameter Space Offset
-      uint64_t rxParamSpaceOffsetAddr =
-          globalBase + DICE_REGISTER_RX_PAR_SPACE_OFF;
+      UInt64 rxParamSpaceOffsetAddr =
+          globalBase + DICE_REGISTER_RX_PARAMETER_SPACE_OFFSET;
       UInt32 rxParamSpaceOffsetQuadlets = 0;
       if (safeReadQuadlet(deviceInterface, service, rxParamSpaceOffsetAddr,
-                          rxParamSpaceOffsetQuadlets,
+                          &rxParamSpaceOffsetQuadlets,
                           generation) == kIOReturnSuccess) {
         rxParamSpaceOffsetQuadlets =
             deviceToHostInt32(rxParamSpaceOffsetQuadlets, deviceEndianness);
-        uint64_t rxParamSpaceBase =
-            globalBase + (rxParamSpaceOffsetQuadlets * 4);
+        UInt64 rxParamSpaceBase = globalBase + (rxParamSpaceOffsetQuadlets * 4);
 
         // Check each RX stream for NAMES_BASE
-        for (uint32_t i = 0; i < rxStreamCount && i < 8;
+        for (UInt32 i = 0; i < rxStreamCount && i < 8;
              i++) // Limit to 8 streams for safety
         {
-          uint64_t streamInstanceOffsetBytes = i * rxStreamSizeQuadlets * 4;
-          uint64_t namesBaseAddr = rxParamSpaceBase +
-                                   streamInstanceOffsetBytes +
-                                   DICE_REGISTER_RX_NAMES_BASE;
+          UInt64 streamInstanceOffsetBytes = i * rxStreamSizeQuadlets * 4;
+          UInt64 namesBaseAddr = rxParamSpaceBase + streamInstanceOffsetBytes +
+                                 DICE_REGISTER_RX_NAMES_BASE_OFFSET;
 
           UInt32 namesBaseValue = 0;
           if (safeReadQuadlet(deviceInterface, service, namesBaseAddr,
-                              namesBaseValue, generation) == kIOReturnSuccess) {
-            uint32_t namesBaseOffset = CFSwapInt32LittleToHost(namesBaseValue);
+                              &namesBaseValue,
+                              generation) == kIOReturnSuccess) {
+            UInt32 namesBaseOffset = CFSwapInt32LittleToHost(namesBaseValue);
             if (namesBaseOffset != 0) {
               // Convert quadlet offset to absolute address
-              uint64_t channelNamesAddr = globalBase + (namesBaseOffset * 4);
+              UInt64 channelNamesAddr = globalBase + (namesBaseOffset * 4);
               std::cerr << "Debug [Utils]: Found RX[" << i
                         << "] NAMES_BASE pointer: 0x" << std::hex
                         << channelNamesAddr << std::dec << std::endl;
@@ -184,38 +179,38 @@ discoverChannelNamesAddress(IOFireWireDeviceInterface **deviceInterface,
 
   // Step 2: Check EAP structures for channel name pointers
   // Try to read EAP Current Config Space Offset
-  uint64_t eapCurrCfgOffsetAddr = DICE_EAP_CURR_CFG_SPACE_ADDR;
+  UInt64 eapCurrCfgOffsetAddr = DICE_EAP_CURR_CFG_SPACE_ADDR;
   UInt32 eapCurrCfgOffsetQuadlets = 0;
   if (safeReadQuadlet(deviceInterface, service, eapCurrCfgOffsetAddr,
-                      eapCurrCfgOffsetQuadlets,
+                      &eapCurrCfgOffsetQuadlets,
                       generation) == kIOReturnSuccess) {
-    uint64_t eapCurrCfgBaseAddr =
+    UInt64 eapCurrCfgBaseAddr =
         DICE_REGISTER_BASE +
         (deviceToHostInt32(eapCurrCfgOffsetQuadlets, deviceEndianness) * 4);
     std::cerr << "Debug [Utils]: Found EAP Current Config Space at 0x"
               << std::hex << eapCurrCfgBaseAddr << std::dec << std::endl;
 
     // Check LOW, MID, and HIGH stream configs
-    std::vector<uint64_t> streamConfigOffsets = {DICE_EAP_CURRCFG_LOW_STREAM,
-                                                 DICE_EAP_CURRCFG_MID_STREAM,
-                                                 DICE_EAP_CURRCFG_HIGH_STREAM};
+    std::vector<UInt64> streamConfigOffsets = {
+        DICE_EAP_CURRCFG_LOW_STREAM_OFFSET, DICE_EAP_CURRCFG_MID_STREAM_OFFSET,
+        DICE_EAP_CURRCFG_HIGH_STREAM_OFFSET};
 
-    for (uint64_t offset : streamConfigOffsets) {
-      uint64_t configBlockBase = eapCurrCfgBaseAddr + offset;
+    for (UInt64 offset : streamConfigOffsets) {
+      UInt64 configBlockBase = eapCurrCfgBaseAddr + offset;
 
       // Read the first few quadlets to check for channel name pointers
       for (int i = 0; i < 16; i++) // Check first 16 quadlets
       {
         UInt32 value = 0;
         if (safeReadQuadlet(deviceInterface, service, configBlockBase + (i * 4),
-                            value, generation) == kIOReturnSuccess) {
+                            &value, generation) == kIOReturnSuccess) {
           // If this looks like a valid pointer (non-zero and within reasonable
           // range)
-          uint32_t hostValue = CFSwapInt32LittleToHost(value);
+          UInt32 hostValue = CFSwapInt32LittleToHost(value);
           if (hostValue != 0 &&
               hostValue < 0x100000) // Reasonable quadlet offset
           {
-            uint64_t potentialAddr = DICE_REGISTER_BASE + (hostValue * 4);
+            UInt64 potentialAddr = DICE_REGISTER_BASE + (hostValue * 4);
             namesBasePointers.push_back(potentialAddr);
             std::cerr
                 << "Debug [Utils]: Found potential EAP channel name pointer: 0x"
@@ -227,19 +222,19 @@ discoverChannelNamesAddress(IOFireWireDeviceInterface **deviceInterface,
   }
 
   // Step 3: Validate each potential NAMES_BASE pointer
-  for (uint64_t addr : namesBasePointers) {
+  for (UInt64 addr : namesBasePointers) {
     std::cerr << "Debug [Utils]: Validating potential channel names address 0x"
               << std::hex << addr << std::dec << std::endl;
 
     // Read a block of memory at this address
     const int BLOCK_SIZE = 256; // 256 quadlets = 1024 bytes
-    std::map<uint64_t, uint32_t> memoryBlock;
+    std::map<UInt64, UInt32> memoryBlock;
     bool validBlock = true;
 
     for (int i = 0; i < BLOCK_SIZE; i++) {
       UInt32 value = 0;
       IOReturn status = safeReadQuadlet(deviceInterface, service,
-                                        addr + (i * 4), value, generation);
+                                        addr + (i * 4), &value, generation);
       if (status != kIOReturnSuccess) {
         if (i == 0) {
           // If we can't read the first quadlet, this address is invalid
@@ -293,7 +288,7 @@ discoverChannelNamesAddress(IOFireWireDeviceInterface **deviceInterface,
             << std::endl;
 
   // Known potential addresses for channel names
-  std::vector<uint64_t> potentialAddresses = {
+  std::vector<UInt64> potentialAddresses = {
       DICE_CHANNEL_NAMES_ADDR_1, // Known address from previous scans
       DICE_CHANNEL_NAMES_ADDR_2, // Channel Configuration area
       DICE_CHANNEL_NAMES_ADDR_3, // Another potential area
@@ -301,19 +296,19 @@ discoverChannelNamesAddress(IOFireWireDeviceInterface **deviceInterface,
   };
 
   // Try each address and look for channel name patterns
-  for (uint64_t addr : potentialAddresses) {
+  for (UInt64 addr : potentialAddresses) {
     std::cerr << "Debug [Utils]: Checking address 0x" << std::hex << addr
               << std::dec << " for channel names..." << std::endl;
 
     // Read a block of memory at this address
     const int BLOCK_SIZE = 256; // 256 quadlets = 1024 bytes
-    std::map<uint64_t, uint32_t> memoryBlock;
+    std::map<UInt64, UInt32> memoryBlock;
     bool validBlock = true;
 
     for (int i = 0; i < BLOCK_SIZE; i++) {
       UInt32 value = 0;
       IOReturn status = safeReadQuadlet(deviceInterface, service,
-                                        addr + (i * 4), value, generation);
+                                        addr + (i * 4), &value, generation);
       if (status != kIOReturnSuccess) {
         std::cerr << "Debug [Utils]: Failed to read quadlet at 0x" << std::hex
                   << addr + (i * 4) << std::dec << std::endl;

@@ -32,7 +32,7 @@ namespace FWA::SCANNER {
  * @return Vector of StringMatch objects containing the extracted strings
  */
 std::vector<StringMatch>
-extractStringsFromMemory(const std::map<uint64_t, uint32_t> &registers);
+extractStringsFromMemory(const std::map<UInt64, UInt32> &registers);
 
 /**
  * @brief Dynamically discovers the address where channel names are stored
@@ -47,9 +47,8 @@ extractStringsFromMemory(const std::map<uint64_t, uint32_t> &registers);
  * @param generation The current bus generation number
  * @return The discovered address, or a default fallback if none is found
  */
-uint64_t
-discoverChannelNamesAddress(IOFireWireDeviceInterface **deviceInterface,
-                            io_service_t service, UInt32 generation);
+UInt64 discoverChannelNamesAddress(IOFireWireDeviceInterface **deviceInterface,
+                                   io_service_t service, UInt32 generation);
 
 /**
  * @brief Validates a set of channel numbers for consistency and reasonableness
@@ -83,7 +82,7 @@ void validateChannelNumbers(const std::set<int> &channelNumbers,
  */
 void exploreDiceMemoryLayout(IOFireWireDeviceInterface **deviceInterface,
                              io_service_t service, FireWireDevice &device,
-                             UInt32 generation, uint64_t baseAddr);
+                             UInt32 generation, UInt64 baseAddr);
 
 /**
  * @brief Extracts coherent ASCII strings from DICE register values.
