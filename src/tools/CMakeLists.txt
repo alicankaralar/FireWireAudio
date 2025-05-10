@@ -18,7 +18,6 @@ set(EXECUTABLE_NAME firewire_scanner) # Renamed to avoid conflict with 'scanner'
 set(SCANNER_SOURCES
     scanner/config_rom.cpp
     scanner/channel_count_validator.cpp
-    scanner/dice_helpers.cpp
     scanner/dice_stream_registers.cpp
     scanner/eap_helpers.cpp
     scanner/endianness_helpers.cpp
@@ -58,6 +57,8 @@ set(SCANNER_SOURCES
     scanner/channel_name_extractor.cpp
     scanner/channel_pattern_matcher.cpp
     scanner/channel_summary_reporter.cpp
+    # New stream helper functions 
+    scanner/dice_stream_helpers.cpp
 )
 
 # Add include directories relative to this CMakeLists.txt

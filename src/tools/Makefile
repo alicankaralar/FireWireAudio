@@ -57,10 +57,10 @@ RM = /opt/homebrew/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /Users/alicankaralar/Projects/firewireaudio/src/tools
+CMAKE_SOURCE_DIR = /Users/alicankaralar/Projects/FireWireAudio/src/tools
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /Users/alicankaralar/Projects/firewireaudio/src/tools
+CMAKE_BINARY_DIR = /Users/alicankaralar/Projects/FireWireAudio/src/tools
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -87,9 +87,9 @@ rebuild_cache/fast: rebuild_cache
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/alicankaralar/Projects/firewireaudio/src/tools/CMakeFiles /Users/alicankaralar/Projects/firewireaudio/src/tools//CMakeFiles/progress.marks
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/alicankaralar/Projects/FireWireAudio/src/tools/CMakeFiles /Users/alicankaralar/Projects/FireWireAudio/src/tools//CMakeFiles/progress.marks
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/alicankaralar/Projects/firewireaudio/src/tools/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/alicankaralar/Projects/FireWireAudio/src/tools/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
@@ -129,6 +129,139 @@ firewire_scanner/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/build
 .PHONY : firewire_scanner/fast
 
+#=============================================================================
+# Target rules for targets named spdlog
+
+# Build rule for target.
+spdlog: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 spdlog
+.PHONY : spdlog
+
+# fast build rule for target.
+spdlog/fast:
+	$(MAKE) $(MAKESILENT) -f _deps/spdlog-build/CMakeFiles/spdlog.dir/build.make _deps/spdlog-build/CMakeFiles/spdlog.dir/build
+.PHONY : spdlog/fast
+
+scanner/channel_count_validator.o: scanner/channel_count_validator.cpp.o
+.PHONY : scanner/channel_count_validator.o
+
+# target to build an object file
+scanner/channel_count_validator.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/channel_count_validator.cpp.o
+.PHONY : scanner/channel_count_validator.cpp.o
+
+scanner/channel_count_validator.i: scanner/channel_count_validator.cpp.i
+.PHONY : scanner/channel_count_validator.i
+
+# target to preprocess a source file
+scanner/channel_count_validator.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/channel_count_validator.cpp.i
+.PHONY : scanner/channel_count_validator.cpp.i
+
+scanner/channel_count_validator.s: scanner/channel_count_validator.cpp.s
+.PHONY : scanner/channel_count_validator.s
+
+# target to generate assembly for a file
+scanner/channel_count_validator.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/channel_count_validator.cpp.s
+.PHONY : scanner/channel_count_validator.cpp.s
+
+scanner/channel_discovery.o: scanner/channel_discovery.cpp.o
+.PHONY : scanner/channel_discovery.o
+
+# target to build an object file
+scanner/channel_discovery.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/channel_discovery.cpp.o
+.PHONY : scanner/channel_discovery.cpp.o
+
+scanner/channel_discovery.i: scanner/channel_discovery.cpp.i
+.PHONY : scanner/channel_discovery.i
+
+# target to preprocess a source file
+scanner/channel_discovery.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/channel_discovery.cpp.i
+.PHONY : scanner/channel_discovery.cpp.i
+
+scanner/channel_discovery.s: scanner/channel_discovery.cpp.s
+.PHONY : scanner/channel_discovery.s
+
+# target to generate assembly for a file
+scanner/channel_discovery.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/channel_discovery.cpp.s
+.PHONY : scanner/channel_discovery.cpp.s
+
+scanner/channel_name_extractor.o: scanner/channel_name_extractor.cpp.o
+.PHONY : scanner/channel_name_extractor.o
+
+# target to build an object file
+scanner/channel_name_extractor.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/channel_name_extractor.cpp.o
+.PHONY : scanner/channel_name_extractor.cpp.o
+
+scanner/channel_name_extractor.i: scanner/channel_name_extractor.cpp.i
+.PHONY : scanner/channel_name_extractor.i
+
+# target to preprocess a source file
+scanner/channel_name_extractor.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/channel_name_extractor.cpp.i
+.PHONY : scanner/channel_name_extractor.cpp.i
+
+scanner/channel_name_extractor.s: scanner/channel_name_extractor.cpp.s
+.PHONY : scanner/channel_name_extractor.s
+
+# target to generate assembly for a file
+scanner/channel_name_extractor.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/channel_name_extractor.cpp.s
+.PHONY : scanner/channel_name_extractor.cpp.s
+
+scanner/channel_pattern_matcher.o: scanner/channel_pattern_matcher.cpp.o
+.PHONY : scanner/channel_pattern_matcher.o
+
+# target to build an object file
+scanner/channel_pattern_matcher.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/channel_pattern_matcher.cpp.o
+.PHONY : scanner/channel_pattern_matcher.cpp.o
+
+scanner/channel_pattern_matcher.i: scanner/channel_pattern_matcher.cpp.i
+.PHONY : scanner/channel_pattern_matcher.i
+
+# target to preprocess a source file
+scanner/channel_pattern_matcher.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/channel_pattern_matcher.cpp.i
+.PHONY : scanner/channel_pattern_matcher.cpp.i
+
+scanner/channel_pattern_matcher.s: scanner/channel_pattern_matcher.cpp.s
+.PHONY : scanner/channel_pattern_matcher.s
+
+# target to generate assembly for a file
+scanner/channel_pattern_matcher.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/channel_pattern_matcher.cpp.s
+.PHONY : scanner/channel_pattern_matcher.cpp.s
+
+scanner/channel_summary_reporter.o: scanner/channel_summary_reporter.cpp.o
+.PHONY : scanner/channel_summary_reporter.o
+
+# target to build an object file
+scanner/channel_summary_reporter.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/channel_summary_reporter.cpp.o
+.PHONY : scanner/channel_summary_reporter.cpp.o
+
+scanner/channel_summary_reporter.i: scanner/channel_summary_reporter.cpp.i
+.PHONY : scanner/channel_summary_reporter.i
+
+# target to preprocess a source file
+scanner/channel_summary_reporter.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/channel_summary_reporter.cpp.i
+.PHONY : scanner/channel_summary_reporter.cpp.i
+
+scanner/channel_summary_reporter.s: scanner/channel_summary_reporter.cpp.s
+.PHONY : scanner/channel_summary_reporter.s
+
+# target to generate assembly for a file
+scanner/channel_summary_reporter.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/channel_summary_reporter.cpp.s
+.PHONY : scanner/channel_summary_reporter.cpp.s
+
 scanner/config_rom.o: scanner/config_rom.cpp.o
 .PHONY : scanner/config_rom.o
 
@@ -153,29 +286,245 @@ scanner/config_rom.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/config_rom.cpp.s
 .PHONY : scanner/config_rom.cpp.s
 
-scanner/dice_helpers.o: scanner/dice_helpers.cpp.o
-.PHONY : scanner/dice_helpers.o
+scanner/dice_aes_registers.o: scanner/dice_aes_registers.cpp.o
+.PHONY : scanner/dice_aes_registers.o
 
 # target to build an object file
-scanner/dice_helpers.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_helpers.cpp.o
-.PHONY : scanner/dice_helpers.cpp.o
+scanner/dice_aes_registers.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_aes_registers.cpp.o
+.PHONY : scanner/dice_aes_registers.cpp.o
 
-scanner/dice_helpers.i: scanner/dice_helpers.cpp.i
-.PHONY : scanner/dice_helpers.i
+scanner/dice_aes_registers.i: scanner/dice_aes_registers.cpp.i
+.PHONY : scanner/dice_aes_registers.i
 
 # target to preprocess a source file
-scanner/dice_helpers.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_helpers.cpp.i
-.PHONY : scanner/dice_helpers.cpp.i
+scanner/dice_aes_registers.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_aes_registers.cpp.i
+.PHONY : scanner/dice_aes_registers.cpp.i
 
-scanner/dice_helpers.s: scanner/dice_helpers.cpp.s
-.PHONY : scanner/dice_helpers.s
+scanner/dice_aes_registers.s: scanner/dice_aes_registers.cpp.s
+.PHONY : scanner/dice_aes_registers.s
 
 # target to generate assembly for a file
-scanner/dice_helpers.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_helpers.cpp.s
-.PHONY : scanner/dice_helpers.cpp.s
+scanner/dice_aes_registers.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_aes_registers.cpp.s
+.PHONY : scanner/dice_aes_registers.cpp.s
+
+scanner/dice_avs_registers.o: scanner/dice_avs_registers.cpp.o
+.PHONY : scanner/dice_avs_registers.o
+
+# target to build an object file
+scanner/dice_avs_registers.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_avs_registers.cpp.o
+.PHONY : scanner/dice_avs_registers.cpp.o
+
+scanner/dice_avs_registers.i: scanner/dice_avs_registers.cpp.i
+.PHONY : scanner/dice_avs_registers.i
+
+# target to preprocess a source file
+scanner/dice_avs_registers.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_avs_registers.cpp.i
+.PHONY : scanner/dice_avs_registers.cpp.i
+
+scanner/dice_avs_registers.s: scanner/dice_avs_registers.cpp.s
+.PHONY : scanner/dice_avs_registers.s
+
+# target to generate assembly for a file
+scanner/dice_avs_registers.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_avs_registers.cpp.s
+.PHONY : scanner/dice_avs_registers.cpp.s
+
+scanner/dice_base_discovery.o: scanner/dice_base_discovery.cpp.o
+.PHONY : scanner/dice_base_discovery.o
+
+# target to build an object file
+scanner/dice_base_discovery.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_base_discovery.cpp.o
+.PHONY : scanner/dice_base_discovery.cpp.o
+
+scanner/dice_base_discovery.i: scanner/dice_base_discovery.cpp.i
+.PHONY : scanner/dice_base_discovery.i
+
+# target to preprocess a source file
+scanner/dice_base_discovery.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_base_discovery.cpp.i
+.PHONY : scanner/dice_base_discovery.cpp.i
+
+scanner/dice_base_discovery.s: scanner/dice_base_discovery.cpp.s
+.PHONY : scanner/dice_base_discovery.s
+
+# target to generate assembly for a file
+scanner/dice_base_discovery.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_base_discovery.cpp.s
+.PHONY : scanner/dice_base_discovery.cpp.s
+
+scanner/dice_clock_registers.o: scanner/dice_clock_registers.cpp.o
+.PHONY : scanner/dice_clock_registers.o
+
+# target to build an object file
+scanner/dice_clock_registers.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_clock_registers.cpp.o
+.PHONY : scanner/dice_clock_registers.cpp.o
+
+scanner/dice_clock_registers.i: scanner/dice_clock_registers.cpp.i
+.PHONY : scanner/dice_clock_registers.i
+
+# target to preprocess a source file
+scanner/dice_clock_registers.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_clock_registers.cpp.i
+.PHONY : scanner/dice_clock_registers.cpp.i
+
+scanner/dice_clock_registers.s: scanner/dice_clock_registers.cpp.s
+.PHONY : scanner/dice_clock_registers.s
+
+# target to generate assembly for a file
+scanner/dice_clock_registers.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_clock_registers.cpp.s
+.PHONY : scanner/dice_clock_registers.cpp.s
+
+scanner/dice_config.o: scanner/dice_config.cpp.o
+.PHONY : scanner/dice_config.o
+
+# target to build an object file
+scanner/dice_config.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_config.cpp.o
+.PHONY : scanner/dice_config.cpp.o
+
+scanner/dice_config.i: scanner/dice_config.cpp.i
+.PHONY : scanner/dice_config.i
+
+# target to preprocess a source file
+scanner/dice_config.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_config.cpp.i
+.PHONY : scanner/dice_config.cpp.i
+
+scanner/dice_config.s: scanner/dice_config.cpp.s
+.PHONY : scanner/dice_config.s
+
+# target to generate assembly for a file
+scanner/dice_config.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_config.cpp.s
+.PHONY : scanner/dice_config.cpp.s
+
+scanner/dice_global_registers.o: scanner/dice_global_registers.cpp.o
+.PHONY : scanner/dice_global_registers.o
+
+# target to build an object file
+scanner/dice_global_registers.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_global_registers.cpp.o
+.PHONY : scanner/dice_global_registers.cpp.o
+
+scanner/dice_global_registers.i: scanner/dice_global_registers.cpp.i
+.PHONY : scanner/dice_global_registers.i
+
+# target to preprocess a source file
+scanner/dice_global_registers.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_global_registers.cpp.i
+.PHONY : scanner/dice_global_registers.cpp.i
+
+scanner/dice_global_registers.s: scanner/dice_global_registers.cpp.s
+.PHONY : scanner/dice_global_registers.s
+
+# target to generate assembly for a file
+scanner/dice_global_registers.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_global_registers.cpp.s
+.PHONY : scanner/dice_global_registers.cpp.s
+
+scanner/dice_gpcsr_registers.o: scanner/dice_gpcsr_registers.cpp.o
+.PHONY : scanner/dice_gpcsr_registers.o
+
+# target to build an object file
+scanner/dice_gpcsr_registers.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_gpcsr_registers.cpp.o
+.PHONY : scanner/dice_gpcsr_registers.cpp.o
+
+scanner/dice_gpcsr_registers.i: scanner/dice_gpcsr_registers.cpp.i
+.PHONY : scanner/dice_gpcsr_registers.i
+
+# target to preprocess a source file
+scanner/dice_gpcsr_registers.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_gpcsr_registers.cpp.i
+.PHONY : scanner/dice_gpcsr_registers.cpp.i
+
+scanner/dice_gpcsr_registers.s: scanner/dice_gpcsr_registers.cpp.s
+.PHONY : scanner/dice_gpcsr_registers.s
+
+# target to generate assembly for a file
+scanner/dice_gpcsr_registers.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_gpcsr_registers.cpp.s
+.PHONY : scanner/dice_gpcsr_registers.cpp.s
+
+scanner/dice_mixer_registers.o: scanner/dice_mixer_registers.cpp.o
+.PHONY : scanner/dice_mixer_registers.o
+
+# target to build an object file
+scanner/dice_mixer_registers.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_mixer_registers.cpp.o
+.PHONY : scanner/dice_mixer_registers.cpp.o
+
+scanner/dice_mixer_registers.i: scanner/dice_mixer_registers.cpp.i
+.PHONY : scanner/dice_mixer_registers.i
+
+# target to preprocess a source file
+scanner/dice_mixer_registers.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_mixer_registers.cpp.i
+.PHONY : scanner/dice_mixer_registers.cpp.i
+
+scanner/dice_mixer_registers.s: scanner/dice_mixer_registers.cpp.s
+.PHONY : scanner/dice_mixer_registers.s
+
+# target to generate assembly for a file
+scanner/dice_mixer_registers.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_mixer_registers.cpp.s
+.PHONY : scanner/dice_mixer_registers.cpp.s
+
+scanner/dice_register_readers.o: scanner/dice_register_readers.cpp.o
+.PHONY : scanner/dice_register_readers.o
+
+# target to build an object file
+scanner/dice_register_readers.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_register_readers.cpp.o
+.PHONY : scanner/dice_register_readers.cpp.o
+
+scanner/dice_register_readers.i: scanner/dice_register_readers.cpp.i
+.PHONY : scanner/dice_register_readers.i
+
+# target to preprocess a source file
+scanner/dice_register_readers.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_register_readers.cpp.i
+.PHONY : scanner/dice_register_readers.cpp.i
+
+scanner/dice_register_readers.s: scanner/dice_register_readers.cpp.s
+.PHONY : scanner/dice_register_readers.s
+
+# target to generate assembly for a file
+scanner/dice_register_readers.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_register_readers.cpp.s
+.PHONY : scanner/dice_register_readers.cpp.s
+
+scanner/dice_stream_helpers.o: scanner/dice_stream_helpers.cpp.o
+.PHONY : scanner/dice_stream_helpers.o
+
+# target to build an object file
+scanner/dice_stream_helpers.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_stream_helpers.cpp.o
+.PHONY : scanner/dice_stream_helpers.cpp.o
+
+scanner/dice_stream_helpers.i: scanner/dice_stream_helpers.cpp.i
+.PHONY : scanner/dice_stream_helpers.i
+
+# target to preprocess a source file
+scanner/dice_stream_helpers.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_stream_helpers.cpp.i
+.PHONY : scanner/dice_stream_helpers.cpp.i
+
+scanner/dice_stream_helpers.s: scanner/dice_stream_helpers.cpp.s
+.PHONY : scanner/dice_stream_helpers.s
+
+# target to generate assembly for a file
+scanner/dice_stream_helpers.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/dice_stream_helpers.cpp.s
+.PHONY : scanner/dice_stream_helpers.cpp.s
 
 scanner/dice_stream_registers.o: scanner/dice_stream_registers.cpp.o
 .PHONY : scanner/dice_stream_registers.o
@@ -225,6 +574,30 @@ scanner/eap_helpers.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/eap_helpers.cpp.s
 .PHONY : scanner/eap_helpers.cpp.s
 
+scanner/endianness_helpers.o: scanner/endianness_helpers.cpp.o
+.PHONY : scanner/endianness_helpers.o
+
+# target to build an object file
+scanner/endianness_helpers.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/endianness_helpers.cpp.o
+.PHONY : scanner/endianness_helpers.cpp.o
+
+scanner/endianness_helpers.i: scanner/endianness_helpers.cpp.i
+.PHONY : scanner/endianness_helpers.i
+
+# target to preprocess a source file
+scanner/endianness_helpers.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/endianness_helpers.cpp.i
+.PHONY : scanner/endianness_helpers.cpp.i
+
+scanner/endianness_helpers.s: scanner/endianness_helpers.cpp.s
+.PHONY : scanner/endianness_helpers.s
+
+# target to generate assembly for a file
+scanner/endianness_helpers.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/endianness_helpers.cpp.s
+.PHONY : scanner/endianness_helpers.cpp.s
+
 scanner/io_helpers.o: scanner/io_helpers.cpp.o
 .PHONY : scanner/io_helpers.o
 
@@ -273,6 +646,126 @@ scanner/main.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/main.cpp.s
 .PHONY : scanner/main.cpp.s
 
+scanner/memory_explorer.o: scanner/memory_explorer.cpp.o
+.PHONY : scanner/memory_explorer.o
+
+# target to build an object file
+scanner/memory_explorer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/memory_explorer.cpp.o
+.PHONY : scanner/memory_explorer.cpp.o
+
+scanner/memory_explorer.i: scanner/memory_explorer.cpp.i
+.PHONY : scanner/memory_explorer.i
+
+# target to preprocess a source file
+scanner/memory_explorer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/memory_explorer.cpp.i
+.PHONY : scanner/memory_explorer.cpp.i
+
+scanner/memory_explorer.s: scanner/memory_explorer.cpp.s
+.PHONY : scanner/memory_explorer.s
+
+# target to generate assembly for a file
+scanner/memory_explorer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/memory_explorer.cpp.s
+.PHONY : scanner/memory_explorer.cpp.s
+
+scanner/register_address_ranges.o: scanner/register_address_ranges.cpp.o
+.PHONY : scanner/register_address_ranges.o
+
+# target to build an object file
+scanner/register_address_ranges.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/register_address_ranges.cpp.o
+.PHONY : scanner/register_address_ranges.cpp.o
+
+scanner/register_address_ranges.i: scanner/register_address_ranges.cpp.i
+.PHONY : scanner/register_address_ranges.i
+
+# target to preprocess a source file
+scanner/register_address_ranges.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/register_address_ranges.cpp.i
+.PHONY : scanner/register_address_ranges.cpp.i
+
+scanner/register_address_ranges.s: scanner/register_address_ranges.cpp.s
+.PHONY : scanner/register_address_ranges.s
+
+# target to generate assembly for a file
+scanner/register_address_ranges.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/register_address_ranges.cpp.s
+.PHONY : scanner/register_address_ranges.cpp.s
+
+scanner/register_known_locations.o: scanner/register_known_locations.cpp.o
+.PHONY : scanner/register_known_locations.o
+
+# target to build an object file
+scanner/register_known_locations.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/register_known_locations.cpp.o
+.PHONY : scanner/register_known_locations.cpp.o
+
+scanner/register_known_locations.i: scanner/register_known_locations.cpp.i
+.PHONY : scanner/register_known_locations.i
+
+# target to preprocess a source file
+scanner/register_known_locations.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/register_known_locations.cpp.i
+.PHONY : scanner/register_known_locations.cpp.i
+
+scanner/register_known_locations.s: scanner/register_known_locations.cpp.s
+.PHONY : scanner/register_known_locations.s
+
+# target to generate assembly for a file
+scanner/register_known_locations.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/register_known_locations.cpp.s
+.PHONY : scanner/register_known_locations.cpp.s
+
+scanner/register_name_analyzer.o: scanner/register_name_analyzer.cpp.o
+.PHONY : scanner/register_name_analyzer.o
+
+# target to build an object file
+scanner/register_name_analyzer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/register_name_analyzer.cpp.o
+.PHONY : scanner/register_name_analyzer.cpp.o
+
+scanner/register_name_analyzer.i: scanner/register_name_analyzer.cpp.i
+.PHONY : scanner/register_name_analyzer.i
+
+# target to preprocess a source file
+scanner/register_name_analyzer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/register_name_analyzer.cpp.i
+.PHONY : scanner/register_name_analyzer.cpp.i
+
+scanner/register_name_analyzer.s: scanner/register_name_analyzer.cpp.s
+.PHONY : scanner/register_name_analyzer.s
+
+# target to generate assembly for a file
+scanner/register_name_analyzer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/register_name_analyzer.cpp.s
+.PHONY : scanner/register_name_analyzer.cpp.s
+
+scanner/register_string_analyzer.o: scanner/register_string_analyzer.cpp.o
+.PHONY : scanner/register_string_analyzer.o
+
+# target to build an object file
+scanner/register_string_analyzer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/register_string_analyzer.cpp.o
+.PHONY : scanner/register_string_analyzer.cpp.o
+
+scanner/register_string_analyzer.i: scanner/register_string_analyzer.cpp.i
+.PHONY : scanner/register_string_analyzer.i
+
+# target to preprocess a source file
+scanner/register_string_analyzer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/register_string_analyzer.cpp.i
+.PHONY : scanner/register_string_analyzer.cpp.i
+
+scanner/register_string_analyzer.s: scanner/register_string_analyzer.cpp.s
+.PHONY : scanner/register_string_analyzer.s
+
+# target to generate assembly for a file
+scanner/register_string_analyzer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/register_string_analyzer.cpp.s
+.PHONY : scanner/register_string_analyzer.cpp.s
+
 scanner/scanner.o: scanner/scanner.cpp.o
 .PHONY : scanner/scanner.o
 
@@ -296,6 +789,54 @@ scanner/scanner.s: scanner/scanner.cpp.s
 scanner/scanner.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/scanner.cpp.s
 .PHONY : scanner/scanner.cpp.s
+
+scanner/string_extraction.o: scanner/string_extraction.cpp.o
+.PHONY : scanner/string_extraction.o
+
+# target to build an object file
+scanner/string_extraction.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/string_extraction.cpp.o
+.PHONY : scanner/string_extraction.cpp.o
+
+scanner/string_extraction.i: scanner/string_extraction.cpp.i
+.PHONY : scanner/string_extraction.i
+
+# target to preprocess a source file
+scanner/string_extraction.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/string_extraction.cpp.i
+.PHONY : scanner/string_extraction.cpp.i
+
+scanner/string_extraction.s: scanner/string_extraction.cpp.s
+.PHONY : scanner/string_extraction.s
+
+# target to generate assembly for a file
+scanner/string_extraction.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/string_extraction.cpp.s
+.PHONY : scanner/string_extraction.cpp.s
+
+scanner/utils_explore.o: scanner/utils_explore.cpp.o
+.PHONY : scanner/utils_explore.o
+
+# target to build an object file
+scanner/utils_explore.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/utils_explore.cpp.o
+.PHONY : scanner/utils_explore.cpp.o
+
+scanner/utils_explore.i: scanner/utils_explore.cpp.i
+.PHONY : scanner/utils_explore.i
+
+# target to preprocess a source file
+scanner/utils_explore.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/utils_explore.cpp.i
+.PHONY : scanner/utils_explore.cpp.i
+
+scanner/utils_explore.s: scanner/utils_explore.cpp.s
+.PHONY : scanner/utils_explore.s
+
+# target to generate assembly for a file
+scanner/utils_explore.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/utils_explore.cpp.s
+.PHONY : scanner/utils_explore.cpp.s
 
 scanner/utils_explore_channels.o: scanner/utils_explore_channels.cpp.o
 .PHONY : scanner/utils_explore_channels.o
@@ -345,6 +886,30 @@ scanner/utils_explore_general.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/utils_explore_general.cpp.s
 .PHONY : scanner/utils_explore_general.cpp.s
 
+scanner/utils_memory.o: scanner/utils_memory.cpp.o
+.PHONY : scanner/utils_memory.o
+
+# target to build an object file
+scanner/utils_memory.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/utils_memory.cpp.o
+.PHONY : scanner/utils_memory.cpp.o
+
+scanner/utils_memory.i: scanner/utils_memory.cpp.i
+.PHONY : scanner/utils_memory.i
+
+# target to preprocess a source file
+scanner/utils_memory.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/utils_memory.cpp.i
+.PHONY : scanner/utils_memory.cpp.i
+
+scanner/utils_memory.s: scanner/utils_memory.cpp.s
+.PHONY : scanner/utils_memory.s
+
+# target to generate assembly for a file
+scanner/utils_memory.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/utils_memory.cpp.s
+.PHONY : scanner/utils_memory.cpp.s
+
 scanner/utils_print.o: scanner/utils_print.cpp.o
 .PHONY : scanner/utils_print.o
 
@@ -393,29 +958,29 @@ scanner/utils_signal.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/utils_signal.cpp.s
 .PHONY : scanner/utils_signal.cpp.s
 
-scanner/utils_string.o: scanner/utils_string.cpp.o
-.PHONY : scanner/utils_string.o
+scanner/validation_utils.o: scanner/validation_utils.cpp.o
+.PHONY : scanner/validation_utils.o
 
 # target to build an object file
-scanner/utils_string.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/utils_string.cpp.o
-.PHONY : scanner/utils_string.cpp.o
+scanner/validation_utils.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/validation_utils.cpp.o
+.PHONY : scanner/validation_utils.cpp.o
 
-scanner/utils_string.i: scanner/utils_string.cpp.i
-.PHONY : scanner/utils_string.i
+scanner/validation_utils.i: scanner/validation_utils.cpp.i
+.PHONY : scanner/validation_utils.i
 
 # target to preprocess a source file
-scanner/utils_string.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/utils_string.cpp.i
-.PHONY : scanner/utils_string.cpp.i
+scanner/validation_utils.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/validation_utils.cpp.i
+.PHONY : scanner/validation_utils.cpp.i
 
-scanner/utils_string.s: scanner/utils_string.cpp.s
-.PHONY : scanner/utils_string.s
+scanner/validation_utils.s: scanner/validation_utils.cpp.s
+.PHONY : scanner/validation_utils.s
 
 # target to generate assembly for a file
-scanner/utils_string.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/utils_string.cpp.s
-.PHONY : scanner/utils_string.cpp.s
+scanner/validation_utils.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/firewire_scanner.dir/build.make CMakeFiles/firewire_scanner.dir/scanner/validation_utils.cpp.s
+.PHONY : scanner/validation_utils.cpp.s
 
 # Help Target
 help:
@@ -426,42 +991,112 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... firewire_scanner"
+	@echo "... spdlog"
+	@echo "... scanner/channel_count_validator.o"
+	@echo "... scanner/channel_count_validator.i"
+	@echo "... scanner/channel_count_validator.s"
+	@echo "... scanner/channel_discovery.o"
+	@echo "... scanner/channel_discovery.i"
+	@echo "... scanner/channel_discovery.s"
+	@echo "... scanner/channel_name_extractor.o"
+	@echo "... scanner/channel_name_extractor.i"
+	@echo "... scanner/channel_name_extractor.s"
+	@echo "... scanner/channel_pattern_matcher.o"
+	@echo "... scanner/channel_pattern_matcher.i"
+	@echo "... scanner/channel_pattern_matcher.s"
+	@echo "... scanner/channel_summary_reporter.o"
+	@echo "... scanner/channel_summary_reporter.i"
+	@echo "... scanner/channel_summary_reporter.s"
 	@echo "... scanner/config_rom.o"
 	@echo "... scanner/config_rom.i"
 	@echo "... scanner/config_rom.s"
-	@echo "... scanner/dice_helpers.o"
-	@echo "... scanner/dice_helpers.i"
-	@echo "... scanner/dice_helpers.s"
+	@echo "... scanner/dice_aes_registers.o"
+	@echo "... scanner/dice_aes_registers.i"
+	@echo "... scanner/dice_aes_registers.s"
+	@echo "... scanner/dice_avs_registers.o"
+	@echo "... scanner/dice_avs_registers.i"
+	@echo "... scanner/dice_avs_registers.s"
+	@echo "... scanner/dice_base_discovery.o"
+	@echo "... scanner/dice_base_discovery.i"
+	@echo "... scanner/dice_base_discovery.s"
+	@echo "... scanner/dice_clock_registers.o"
+	@echo "... scanner/dice_clock_registers.i"
+	@echo "... scanner/dice_clock_registers.s"
+	@echo "... scanner/dice_config.o"
+	@echo "... scanner/dice_config.i"
+	@echo "... scanner/dice_config.s"
+	@echo "... scanner/dice_global_registers.o"
+	@echo "... scanner/dice_global_registers.i"
+	@echo "... scanner/dice_global_registers.s"
+	@echo "... scanner/dice_gpcsr_registers.o"
+	@echo "... scanner/dice_gpcsr_registers.i"
+	@echo "... scanner/dice_gpcsr_registers.s"
+	@echo "... scanner/dice_mixer_registers.o"
+	@echo "... scanner/dice_mixer_registers.i"
+	@echo "... scanner/dice_mixer_registers.s"
+	@echo "... scanner/dice_register_readers.o"
+	@echo "... scanner/dice_register_readers.i"
+	@echo "... scanner/dice_register_readers.s"
+	@echo "... scanner/dice_stream_helpers.o"
+	@echo "... scanner/dice_stream_helpers.i"
+	@echo "... scanner/dice_stream_helpers.s"
 	@echo "... scanner/dice_stream_registers.o"
 	@echo "... scanner/dice_stream_registers.i"
 	@echo "... scanner/dice_stream_registers.s"
 	@echo "... scanner/eap_helpers.o"
 	@echo "... scanner/eap_helpers.i"
 	@echo "... scanner/eap_helpers.s"
+	@echo "... scanner/endianness_helpers.o"
+	@echo "... scanner/endianness_helpers.i"
+	@echo "... scanner/endianness_helpers.s"
 	@echo "... scanner/io_helpers.o"
 	@echo "... scanner/io_helpers.i"
 	@echo "... scanner/io_helpers.s"
 	@echo "... scanner/main.o"
 	@echo "... scanner/main.i"
 	@echo "... scanner/main.s"
+	@echo "... scanner/memory_explorer.o"
+	@echo "... scanner/memory_explorer.i"
+	@echo "... scanner/memory_explorer.s"
+	@echo "... scanner/register_address_ranges.o"
+	@echo "... scanner/register_address_ranges.i"
+	@echo "... scanner/register_address_ranges.s"
+	@echo "... scanner/register_known_locations.o"
+	@echo "... scanner/register_known_locations.i"
+	@echo "... scanner/register_known_locations.s"
+	@echo "... scanner/register_name_analyzer.o"
+	@echo "... scanner/register_name_analyzer.i"
+	@echo "... scanner/register_name_analyzer.s"
+	@echo "... scanner/register_string_analyzer.o"
+	@echo "... scanner/register_string_analyzer.i"
+	@echo "... scanner/register_string_analyzer.s"
 	@echo "... scanner/scanner.o"
 	@echo "... scanner/scanner.i"
 	@echo "... scanner/scanner.s"
+	@echo "... scanner/string_extraction.o"
+	@echo "... scanner/string_extraction.i"
+	@echo "... scanner/string_extraction.s"
+	@echo "... scanner/utils_explore.o"
+	@echo "... scanner/utils_explore.i"
+	@echo "... scanner/utils_explore.s"
 	@echo "... scanner/utils_explore_channels.o"
 	@echo "... scanner/utils_explore_channels.i"
 	@echo "... scanner/utils_explore_channels.s"
 	@echo "... scanner/utils_explore_general.o"
 	@echo "... scanner/utils_explore_general.i"
 	@echo "... scanner/utils_explore_general.s"
+	@echo "... scanner/utils_memory.o"
+	@echo "... scanner/utils_memory.i"
+	@echo "... scanner/utils_memory.s"
 	@echo "... scanner/utils_print.o"
 	@echo "... scanner/utils_print.i"
 	@echo "... scanner/utils_print.s"
 	@echo "... scanner/utils_signal.o"
 	@echo "... scanner/utils_signal.i"
 	@echo "... scanner/utils_signal.s"
-	@echo "... scanner/utils_string.o"
-	@echo "... scanner/utils_string.i"
-	@echo "... scanner/utils_string.s"
+	@echo "... scanner/validation_utils.o"
+	@echo "... scanner/validation_utils.i"
+	@echo "... scanner/validation_utils.s"
 .PHONY : help
 
 
