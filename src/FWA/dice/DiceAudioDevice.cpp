@@ -1,10 +1,10 @@
-// src/FWA/DiceAudioDevice.cpp
-#include "FWA/DiceAudioDevice.h"
+// src/FWA/dice/DiceAudioDevice.cpp
+#include "FWA/dice/DiceAudioDevice.h"
 #include "FWA/DeviceController.h"
-#include "FWA/DiceAbsoluteAddresses.hpp"
-#include "FWA/DiceDefines.hpp"
-#include "FWA/DiceEAP.hpp"
-#include "FWA/DiceRouter.hpp"
+#include "FWA/dice/DiceAbsoluteAddresses.hpp"
+#include "FWA/dice/DiceDefines.hpp"
+#include "FWA/dice/DiceEAP.hpp"
+#include "FWA/dice/DiceRouter.hpp"
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
 #include <IOKit/avc/IOFireWireAVCLib.h>
@@ -56,13 +56,15 @@ std::expected<void, IOKitError> DiceAudioDevice::init() {
 
   // Call base class init first
   spdlog::info("DICE INIT: Calling base AudioDevice::init()");
-  std::expected<void, IOKitError> baseResult = AudioDevice::init();
-  if (!baseResult) {
-    spdlog::error("DICE INIT ERROR: Base AudioDevice initialization failed: %d",
-                  static_cast<int>(baseResult.error()));
-    return std::unexpected(baseResult.error());
-  }
-  spdlog::info("DICE INIT: Base AudioDevice::init() completed successfully");
+  // std::expected<void, IOKitError> baseResult = AudioDevice::init();
+  // if (!baseResult)
+  // {
+  //     spdlog::error("DICE INIT ERROR: Base AudioDevice initialization failed:
+  //     %d",
+  //                   static_cast<int>(baseResult.error()));
+  //     return std::unexpected(baseResult.error());
+  // }
+  // spdlog::info("DICE INIT: Base AudioDevice::init() completed successfully");
 
   // Initialize DICE I/O functions
   spdlog::info(
@@ -80,7 +82,7 @@ std::expected<void, IOKitError> DiceAudioDevice::init() {
   spdlog::info(
       "DICE INIT: Detecting DICE chip type via EAP capability register");
   std::expected<uint32_t, IOKitError> generalCapResult =
-      readGlobalReg(DICE_EAP_CAPABILITY_GENERAL);
+      readGlobalReg(DICE_EAP_CAPABILITY_GENERAL_OFFSET);
   if (generalCapResult) {
     uint32_t generalCap = generalCapResult.value();
     int chipTypeValue = (generalCap >> DICE_EAP_CAP_GENERAL_CHIP) & 0xFF;
@@ -145,17 +147,77 @@ std::expected<void, IOKitError> DiceAudioDevice::discoverCapabilities() {
   spdlog::info("Discovering capabilities for DiceAudioDevice (GUID: 0x%llx)",
                getGuid());
 
-  // Call base class method first
-  std::expected<void, IOKitError> baseResult =
-      AudioDevice::discoverCapabilities();
-  if (!baseResult) {
-    spdlog::error("Base AudioDevice capability discovery failed: %d",
-                  static_cast<int>(baseResult.error()));
-    return std::unexpected(baseResult.error());
-  }
-
   // Read DICE-specific capabilities
 
+  // 1. Discover supported sample rates
+  auto supportedRatesResult = getSupportedSampleRates();
+  if (!supportedRatesResult) {
+    spdlog::error("Failed to get supported sample rates: {}",
+                  static_cast<int>(supportedRatesResult.error()));
+    return std::unexpected(supportedRatesResult.error());
+  }
+
+  // Log the supported sample rates
+  spdlog::info("Supported sample rates:");
+  for (const auto &rate : supportedRatesResult.value()) {
+    spdlog::info("  {} Hz", rate);
+  }
+
+  // 2. Discover clock sources
+  auto clockSourcesResult = getClockSourceNameString();
+  if (!clockSourcesResult.empty()) {
+    spdlog::info("Found {} clock sources", clockSourcesResult.size());
+    for (size_t i = 0; i < clockSourcesResult.size(); i++) {
+      spdlog::info("  Clock source {}: {}", i, clockSourcesResult[i]);
+    }
+  } else {
+    spdlog::warn("No clock sources found");
+  }
+
+  // 3. Discover TX/RX channel configurations
+  spdlog::info("Discovered {} TX streams", m_nb_tx);
+  for (unsigned int i = 0; i < m_nb_tx; i++) {
+    auto txNames = getTxNameString(i);
+    spdlog::info("  TX[{}]: {} channels", i, txNames.size());
+    for (const auto &name : txNames) {
+      spdlog::info("    Channel: {}", name);
+    }
+  }
+
+  spdlog::info("Discovered {} RX streams", m_nb_rx);
+  for (unsigned int i = 0; i < m_nb_rx; i++) {
+    auto rxNames = getRxNameString(i);
+    spdlog::info("  RX[{}]: {} channels", i, rxNames.size());
+    for (const auto &name : rxNames) {
+      spdlog::info("    Channel: {}", name);
+    }
+  }
+
+  // 4. Get current sample rate and configuration
+  auto sampleRateResult = getSampleRate();
+  if (!sampleRateResult) {
+    spdlog::error("Failed to get current sample rate: {}",
+                  static_cast<int>(sampleRateResult.error()));
+  } else {
+    int currentSampleRate = sampleRateResult.value();
+    spdlog::info("Current sample rate: {} Hz", currentSampleRate);
+  }
+
+  int currentConfig = getCurrentConfig();
+  spdlog::info("Current configuration: {}", [currentConfig]() -> std::string {
+    switch (currentConfig) {
+    case static_cast<int>(DICE::DiceConfig::Low):
+      return "Low (32k-48k)";
+    case static_cast<int>(DICE::DiceConfig::Mid):
+      return "Mid (88.2k-96k)";
+    case static_cast<int>(DICE::DiceConfig::High):
+      return "High (176.4k-192k)";
+    default:
+      return "Unknown";
+    }
+  }());
+
+  spdlog::info("Capability discovery completed successfully");
   return {};
 }
 
@@ -192,7 +254,7 @@ int DiceAudioDevice::getCurrentConfig() // Removed const
 
 std::expected<int, IOKitError> DiceAudioDevice::getSampleRate() {
   std::expected<uint32_t, IOKitError> clockRegResult =
-      readGlobalReg(DICE_REGISTER_GLOBAL_CLOCK_SELECT);
+      readGlobalReg(DICE_REGISTER_GLOBAL_CLOCK_SELECT_OFFSET);
   if (!clockRegResult) {
     spdlog::error("Could not read CLOCK_SELECT register");
     return std::unexpected(clockRegResult.error());
@@ -231,8 +293,9 @@ std::expected<void, IOKitError> DiceAudioDevice::setSampleRate(int sampleRate) {
   switch (sampleRate) {
   case 32000: {
     std::expected<bool, FWA::IOKitError> supportedResult =
-        maskedCheckNotZeroGlobalReg(DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES,
-                                    DICE_CLOCKCAP_RATE_32K);
+        maskedCheckNotZeroGlobalReg(
+            DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES_OFFSET,
+            DICE_CLOCKCAP_RATE_32K);
     if (!supportedResult) {
       spdlog::error("Failed to check 32k support: %d",
                     static_cast<int>(supportedResult.error()));
@@ -244,8 +307,9 @@ std::expected<void, IOKitError> DiceAudioDevice::setSampleRate(int sampleRate) {
   }
   case 44100: {
     std::expected<bool, FWA::IOKitError> supportedResult =
-        maskedCheckNotZeroGlobalReg(DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES,
-                                    DICE_CLOCKCAP_RATE_44K1);
+        maskedCheckNotZeroGlobalReg(
+            DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES_OFFSET,
+            DICE_CLOCKCAP_RATE_44K1);
     if (!supportedResult) {
       spdlog::error("Failed to check 44.1k support: %d",
                     static_cast<int>(supportedResult.error()));
@@ -257,8 +321,9 @@ std::expected<void, IOKitError> DiceAudioDevice::setSampleRate(int sampleRate) {
   }
   case 48000: {
     std::expected<bool, FWA::IOKitError> supportedResult =
-        maskedCheckNotZeroGlobalReg(DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES,
-                                    DICE_CLOCKCAP_RATE_48K);
+        maskedCheckNotZeroGlobalReg(
+            DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES_OFFSET,
+            DICE_CLOCKCAP_RATE_48K);
     if (!supportedResult) {
       spdlog::error("Failed to check 48k support: %d",
                     static_cast<int>(supportedResult.error()));
@@ -270,8 +335,9 @@ std::expected<void, IOKitError> DiceAudioDevice::setSampleRate(int sampleRate) {
   }
   case 88200: {
     std::expected<bool, FWA::IOKitError> supportedResult =
-        maskedCheckNotZeroGlobalReg(DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES,
-                                    DICE_CLOCKCAP_RATE_88K2);
+        maskedCheckNotZeroGlobalReg(
+            DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES_OFFSET,
+            DICE_CLOCKCAP_RATE_88K2);
     if (!supportedResult) {
       spdlog::error("Failed to check 88.2k support: %d",
                     static_cast<int>(supportedResult.error()));
@@ -283,8 +349,9 @@ std::expected<void, IOKitError> DiceAudioDevice::setSampleRate(int sampleRate) {
   }
   case 96000: {
     std::expected<bool, FWA::IOKitError> supportedResult =
-        maskedCheckNotZeroGlobalReg(DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES,
-                                    DICE_CLOCKCAP_RATE_96K);
+        maskedCheckNotZeroGlobalReg(
+            DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES_OFFSET,
+            DICE_CLOCKCAP_RATE_96K);
     if (!supportedResult) {
       spdlog::error("Failed to check 96k support: %d",
                     static_cast<int>(supportedResult.error()));
@@ -296,8 +363,9 @@ std::expected<void, IOKitError> DiceAudioDevice::setSampleRate(int sampleRate) {
   }
   case 176400: {
     std::expected<bool, FWA::IOKitError> supportedResult =
-        maskedCheckNotZeroGlobalReg(DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES,
-                                    DICE_CLOCKCAP_RATE_176K4);
+        maskedCheckNotZeroGlobalReg(
+            DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES_OFFSET,
+            DICE_CLOCKCAP_RATE_176K4);
     if (!supportedResult) {
       spdlog::error("Failed to check 176.4k support: %d",
                     static_cast<int>(supportedResult.error()));
@@ -309,8 +377,9 @@ std::expected<void, IOKitError> DiceAudioDevice::setSampleRate(int sampleRate) {
   }
   case 192000: {
     std::expected<bool, FWA::IOKitError> supportedResult =
-        maskedCheckNotZeroGlobalReg(DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES,
-                                    DICE_CLOCKCAP_RATE_192K);
+        maskedCheckNotZeroGlobalReg(
+            DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES_OFFSET,
+            DICE_CLOCKCAP_RATE_192K);
     if (!supportedResult) {
       spdlog::error("Failed to check 192k support: %d",
                     static_cast<int>(supportedResult.error()));
@@ -341,7 +410,7 @@ std::expected<void, IOKitError> DiceAudioDevice::setSampleRate(int sampleRate) {
     return std::unexpected(IOKitError::Busy);
   }
 
-  auto clockRegResult = readGlobalReg(DICE_REGISTER_GLOBAL_CLOCK_SELECT);
+  auto clockRegResult = readGlobalReg(DICE_REGISTER_GLOBAL_CLOCK_SELECT_OFFSET);
   if (!clockRegResult) {
     spdlog::error("Could not read CLOCK_SELECT register");
     return std::unexpected(clockRegResult.error());
@@ -351,14 +420,15 @@ std::expected<void, IOKitError> DiceAudioDevice::setSampleRate(int sampleRate) {
   clockReg = DICE_SET_RATE(clockReg, select);
 
   std::expected<void, IOKitError> writeResult =
-      writeGlobalReg(DICE_REGISTER_GLOBAL_CLOCK_SELECT, clockReg);
+      writeGlobalReg(DICE_REGISTER_GLOBAL_CLOCK_SELECT_OFFSET, clockReg);
   if (!writeResult) {
     spdlog::error("Could not write CLOCK_SELECT register");
     return std::unexpected(writeResult.error());
   }
 
   // Verify the write succeeded
-  auto verifyRegResult = readGlobalReg(DICE_REGISTER_GLOBAL_CLOCK_SELECT);
+  auto verifyRegResult =
+      readGlobalReg(DICE_REGISTER_GLOBAL_CLOCK_SELECT_OFFSET);
   if (!verifyRegResult) {
     spdlog::error("Could not read CLOCK_SELECT register for verification");
     return std::unexpected(verifyRegResult.error());
@@ -371,7 +441,7 @@ std::expected<void, IOKitError> DiceAudioDevice::setSampleRate(int sampleRate) {
   }
 
   // Wait for the device to lock to the new sample rate
-  auto statusRegResult = readGlobalReg(DICE_REGISTER_GLOBAL_STATUS);
+  auto statusRegResult = readGlobalReg(DICE_REGISTER_GLOBAL_STATUS_OFFSET);
   if (!statusRegResult) {
     spdlog::error("Could not read GLOBAL_STATUS register");
     return std::unexpected(statusRegResult.error());
@@ -384,7 +454,7 @@ std::expected<void, IOKitError> DiceAudioDevice::setSampleRate(int sampleRate) {
           DICE_GET_RATE(clockReg) != DICE_STATUS_GET_NOMINAL_RATE(statusReg)) &&
          attempts < 20) {
     usleep(100000); // 100ms
-    statusRegResult = readGlobalReg(DICE_REGISTER_GLOBAL_STATUS);
+    statusRegResult = readGlobalReg(DICE_REGISTER_GLOBAL_STATUS_OFFSET);
     if (!statusRegResult) {
       spdlog::error("Could not read GLOBAL_STATUS register during wait");
       return std::unexpected(statusRegResult.error());
@@ -414,7 +484,7 @@ DiceAudioDevice::getSupportedSampleRates() {
   std::vector<int> rates;
 
   std::expected<bool, IOKitError> check32k = maskedCheckNotZeroGlobalReg(
-      DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES, DICE_CLOCKCAP_RATE_32K);
+      DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES_OFFSET, DICE_CLOCKCAP_RATE_32K);
   if (!check32k)
     return std::unexpected(check32k.error());
   if (check32k.value()) {
@@ -422,7 +492,7 @@ DiceAudioDevice::getSupportedSampleRates() {
   }
 
   std::expected<bool, IOKitError> check44k1 = maskedCheckNotZeroGlobalReg(
-      DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES, DICE_CLOCKCAP_RATE_44K1);
+      DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES_OFFSET, DICE_CLOCKCAP_RATE_44K1);
   if (!check44k1)
     return std::unexpected(check44k1.error());
   if (check44k1.value()) {
@@ -430,7 +500,7 @@ DiceAudioDevice::getSupportedSampleRates() {
   }
 
   std::expected<bool, IOKitError> check48k = maskedCheckNotZeroGlobalReg(
-      DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES, DICE_CLOCKCAP_RATE_48K);
+      DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES_OFFSET, DICE_CLOCKCAP_RATE_48K);
   if (!check48k)
     return std::unexpected(check48k.error());
   if (check48k.value()) {
@@ -438,7 +508,7 @@ DiceAudioDevice::getSupportedSampleRates() {
   }
 
   std::expected<bool, IOKitError> check88k2 = maskedCheckNotZeroGlobalReg(
-      DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES, DICE_CLOCKCAP_RATE_88K2);
+      DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES_OFFSET, DICE_CLOCKCAP_RATE_88K2);
   if (!check88k2)
     return std::unexpected(check88k2.error());
   if (check88k2.value()) {
@@ -446,7 +516,7 @@ DiceAudioDevice::getSupportedSampleRates() {
   }
 
   std::expected<bool, IOKitError> check96k = maskedCheckNotZeroGlobalReg(
-      DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES, DICE_CLOCKCAP_RATE_96K);
+      DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES_OFFSET, DICE_CLOCKCAP_RATE_96K);
   if (!check96k)
     return std::unexpected(check96k.error());
   if (check96k.value()) {
@@ -454,7 +524,7 @@ DiceAudioDevice::getSupportedSampleRates() {
   }
 
   std::expected<bool, IOKitError> check176k4 = maskedCheckNotZeroGlobalReg(
-      DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES, DICE_CLOCKCAP_RATE_176K4);
+      DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES_OFFSET, DICE_CLOCKCAP_RATE_176K4);
   if (!check176k4)
     return std::unexpected(check176k4.error());
   if (check176k4.value()) {
@@ -462,7 +532,7 @@ DiceAudioDevice::getSupportedSampleRates() {
   }
 
   std::expected<bool, IOKitError> check192k = maskedCheckNotZeroGlobalReg(
-      DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES, DICE_CLOCKCAP_RATE_192K);
+      DICE_REGISTER_GLOBAL_CLOCKCAPABILITIES_OFFSET, DICE_CLOCKCAP_RATE_192K);
   if (!check192k)
     return std::unexpected(check192k.error());
   if (check192k.value()) {
@@ -474,7 +544,8 @@ DiceAudioDevice::getSupportedSampleRates() {
 
 std::expected<std::string, IOKitError> DiceAudioDevice::getNickname() {
   std::expected<std::vector<uint32_t>, IOKitError> nameStringResult =
-      readGlobalRegBlock(DICE_REGISTER_GLOBAL_NICK_NAME, DICE_NICK_NAME_SIZE);
+      readGlobalRegBlock(DICE_REGISTER_GLOBAL_NICK_NAME_OFFSET,
+                         DICE_NICK_NAME_SIZE);
   if (!nameStringResult) {
     spdlog::error("Could not read nickname string");
     return std::unexpected(nameStringResult.error());
@@ -518,8 +589,9 @@ DiceAudioDevice::setNickname(const std::string &name) {
   }
 #endif
 
-  std::expected<void, IOKitError> writeResult = writeGlobalRegBlock(
-      DICE_REGISTER_GLOBAL_NICK_NAME, nameData.data(), DICE_NICK_NAME_SIZE);
+  std::expected<void, IOKitError> writeResult =
+      writeGlobalRegBlock(DICE_REGISTER_GLOBAL_NICK_NAME_OFFSET,
+                          nameData.data(), DICE_NICK_NAME_SIZE);
   if (!writeResult) {
     spdlog::error("Could not write nickname string");
     return std::unexpected(writeResult.error());
@@ -529,8 +601,8 @@ DiceAudioDevice::setNickname(const std::string &name) {
 }
 
 std::expected<void, IOKitError> DiceAudioDevice::enableIsoStreaming() {
-  std::expected<void, IOKitError> writeResult =
-      writeGlobalReg(DICE_REGISTER_GLOBAL_ENABLE, DICE_ISOSTREAMING_ENABLE);
+  std::expected<void, IOKitError> writeResult = writeGlobalReg(
+      DICE_REGISTER_GLOBAL_ENABLE_OFFSET, DICE_ISOSTREAMING_ENABLE);
   if (!writeResult) {
     spdlog::error("Could not enable isochronous streaming");
     return std::unexpected(writeResult.error());
@@ -539,8 +611,8 @@ std::expected<void, IOKitError> DiceAudioDevice::enableIsoStreaming() {
 }
 
 std::expected<void, IOKitError> DiceAudioDevice::disableIsoStreaming() {
-  std::expected<void, IOKitError> writeResult =
-      writeGlobalReg(DICE_REGISTER_GLOBAL_ENABLE, DICE_ISOSTREAMING_DISABLE);
+  std::expected<void, IOKitError> writeResult = writeGlobalReg(
+      DICE_REGISTER_GLOBAL_ENABLE_OFFSET, DICE_ISOSTREAMING_DISABLE);
   if (!writeResult) {
     spdlog::error("Could not disable isochronous streaming");
     return std::unexpected(writeResult.error());
@@ -550,7 +622,7 @@ std::expected<void, IOKitError> DiceAudioDevice::disableIsoStreaming() {
 
 std::expected<bool, IOKitError> DiceAudioDevice::isIsoStreamingEnabled() {
   std::expected<uint32_t, IOKitError> enableRegResult =
-      readGlobalReg(DICE_REGISTER_GLOBAL_ENABLE);
+      readGlobalReg(DICE_REGISTER_GLOBAL_ENABLE_OFFSET);
   if (!enableRegResult) {
     spdlog::error("Could not read ENABLE register");
     return std::unexpected(enableRegResult.error());
@@ -670,11 +742,11 @@ std::expected<void, IOKitError> DiceAudioDevice::initIoFunctions() {
                "sizes **********");
 
   // Read offsets and sizes (returned in quadlets, but we use byte values)
-  spdlog::info(
-      "DICE IO INIT: Reading GLOBAL_PAR_SPACE_OFF register at offset 0x{:08x}",
-      DICE_REGISTER_GLOBAL_PAR_SPACE_OFF);
+  spdlog::info("DICE IO INIT: Reading GLOBAL_PAR_SPACE_OFFSET register at "
+               "offset 0x{:08x}",
+               DICE_REGISTER_GLOBAL_PARAMETER_SPACE_OFFSET);
   std::expected<uint32_t, IOKitError> global_offset_res =
-      readReg(DICE_REGISTER_GLOBAL_PAR_SPACE_OFF);
+      readReg(DICE_REGISTER_GLOBAL_PARAMETER_SPACE_OFFSET);
   if (!global_offset_res) {
     spdlog::error("DICE IO INIT ERROR: Could not initialize "
                   "m_global_reg_offset - error code: {}",
@@ -682,14 +754,15 @@ std::expected<void, IOKitError> DiceAudioDevice::initIoFunctions() {
     return std::unexpected(global_offset_res.error());
   }
   m_global_reg_offset = global_offset_res.value() * 4;
-  spdlog::info("DICE IO INIT: Successfully read GLOBAL_PAR_SPACE_OFF: 0x{:08x} "
-               "(byte value: 0x{:08x})",
-               global_offset_res.value(), m_global_reg_offset);
+  spdlog::info(
+      "DICE IO INIT: Successfully read GLOBAL_PAR_SPACE_OFFSET: 0x{:08x} "
+      "(byte value: 0x{:08x})",
+      global_offset_res.value(), m_global_reg_offset);
 
   spdlog::info(
-      "DICE IO INIT: Reading GLOBAL_PAR_SPACE_SZ register at offset 0x{:08x}",
-      DICE_REGISTER_GLOBAL_PAR_SPACE_SZ);
-  auto global_size_res = readReg(DICE_REGISTER_GLOBAL_PAR_SPACE_SZ);
+      "DICE IO INIT: Reading GLOBAL_PAR_SPACE_SIZE register at offset 0x{:08x}",
+      DICE_REGISTER_GLOBAL_PARAMETER_SPACE_SIZE);
+  auto global_size_res = readReg(DICE_REGISTER_GLOBAL_PARAMETER_SPACE_SIZE);
   if (!global_size_res) {
     spdlog::error("DICE IO INIT ERROR: Could not initialize m_global_reg_size "
                   "- error code: {}",
@@ -697,15 +770,16 @@ std::expected<void, IOKitError> DiceAudioDevice::initIoFunctions() {
     return std::unexpected(global_size_res.error());
   }
   m_global_reg_size = global_size_res.value() * 4;
-  spdlog::info("DICE IO INIT: Successfully read GLOBAL_PAR_SPACE_SZ: 0x{:08x} "
-               "(byte value: 0x{:08x})",
-               global_size_res.value(), m_global_reg_size);
+  spdlog::info(
+      "DICE IO INIT: Successfully read GLOBAL_PAR_SPACE_SIZE: 0x{:08x} "
+      "(byte value: 0x{:08x})",
+      global_size_res.value(), m_global_reg_size);
 
   spdlog::info(
-      "DICE IO INIT: Reading TX_PAR_SPACE_OFF register at offset 0x{:08x}",
-      DICE_REGISTER_TX_PAR_SPACE_OFF);
+      "DICE IO INIT: Reading TX_PAR_SPACE_OFFSET register at offset 0x{:08x}",
+      DICE_REGISTER_TX_PARAMETER_SPACE_OFFSET);
   std::expected<uint32_t, IOKitError> tx_offset_res =
-      readReg(DICE_REGISTER_TX_PAR_SPACE_OFF);
+      readReg(DICE_REGISTER_TX_PARAMETER_SPACE_OFFSET);
   if (!tx_offset_res) {
     spdlog::error("DICE IO INIT ERROR: Could not initialize m_tx_reg_offset - "
                   "error code: {}",
@@ -713,81 +787,83 @@ std::expected<void, IOKitError> DiceAudioDevice::initIoFunctions() {
     return std::unexpected(tx_offset_res.error());
   }
   m_tx_reg_offset = tx_offset_res.value() * 4;
-  spdlog::info("DICE IO INIT: Successfully read TX_PAR_SPACE_OFF: 0x{:08x} "
+  spdlog::info("DICE IO INIT: Successfully read TX_PAR_SPACE_OFFSET: 0x{:08x} "
                "(byte value: 0x{:08x})",
                tx_offset_res.value(), m_tx_reg_offset);
 
-  auto tx_size_res = readReg(DICE_REGISTER_TX_PAR_SPACE_SZ);
+  auto tx_size_res = readReg(DICE_REGISTER_TX_PARAMETER_SPACE_SIZE);
   if (!tx_size_res) {
     spdlog::error("Could not initialize m_tx_reg_size");
     return std::unexpected(tx_size_res.error());
   }
   m_tx_reg_size = tx_size_res.value() * 4;
 
-  auto rx_offset_res = readReg(DICE_REGISTER_RX_PAR_SPACE_OFF);
+  auto rx_offset_res = readReg(DICE_REGISTER_RX_PARAMETER_SPACE_OFFSET);
   if (!rx_offset_res) {
     spdlog::error("Could not initialize m_rx_reg_offset");
     return std::unexpected(rx_offset_res.error());
   }
   m_rx_reg_offset = rx_offset_res.value() * 4;
 
-  auto rx_size_res = readReg(DICE_REGISTER_RX_PAR_SPACE_SZ);
+  auto rx_size_res = readReg(DICE_REGISTER_RX_PARAMETER_SPACE_SIZE);
   if (!rx_size_res) {
     spdlog::error("Could not initialize m_rx_reg_size");
     return std::unexpected(rx_size_res.error());
   }
   m_rx_reg_size = rx_size_res.value() * 4;
 
-  auto unused1_offset_res = readReg(DICE_REGISTER_UNUSED1_SPACE_OFF);
+  auto unused1_offset_res = readReg(DICE_REGISTER_UNUSED1_SPACE_OFFSET);
   if (!unused1_offset_res) {
     spdlog::error("Could not initialize m_unused1_reg_offset");
     return std::unexpected(unused1_offset_res.error());
   }
   m_unused1_reg_offset = unused1_offset_res.value() * 4;
 
-  auto unused1_size_res = readReg(DICE_REGISTER_UNUSED1_SPACE_SZ);
+  auto unused1_size_res = readReg(DICE_REGISTER_UNUSED1_SPACE_SIZE);
   if (!unused1_size_res) {
     spdlog::error("Could not initialize m_unused1_reg_size");
     return std::unexpected(unused1_size_res.error());
   }
   m_unused1_reg_size = unused1_size_res.value() * 4;
 
-  auto unused2_offset_res = readReg(DICE_REGISTER_UNUSED2_SPACE_OFF);
+  auto unused2_offset_res = readReg(DICE_REGISTER_UNUSED2_SPACE_OFFSET);
   if (!unused2_offset_res) {
     spdlog::error("Could not initialize m_unused2_reg_offset");
     return std::unexpected(unused2_offset_res.error());
   }
   m_unused2_reg_offset = unused2_offset_res.value() * 4;
 
-  auto unused2_size_res = readReg(DICE_REGISTER_UNUSED2_SPACE_SZ);
+  auto unused2_size_res = readReg(DICE_REGISTER_UNUSED2_SPACE_SIZE);
   if (!unused2_size_res) {
     spdlog::error("Could not initialize m_unused2_reg_size");
     return std::unexpected(unused2_size_res.error());
   }
   m_unused2_reg_size = unused2_size_res.value() * 4;
 
-  auto nb_tx_res = readReg(m_tx_reg_offset + DICE_REGISTER_TX_NB_TX);
+  auto nb_tx_res = readReg(m_tx_reg_offset + DICE_REGISTER_TX_NUMBER_TX_OFFSET);
   if (!nb_tx_res) {
     spdlog::error("Could not initialize m_nb_tx");
     return std::unexpected(nb_tx_res.error());
   }
   m_nb_tx = nb_tx_res.value();
 
-  auto tx_size_param_res = readReg(m_tx_reg_offset + DICE_REGISTER_TX_SZ_TX);
+  auto tx_size_param_res =
+      readReg(m_tx_reg_offset + DICE_REGISTER_TX_SIZE_TX_OFFSET);
   if (!tx_size_param_res) {
     spdlog::error("Could not initialize m_tx_size");
     return std::unexpected(tx_size_param_res.error());
   }
   m_tx_size = tx_size_param_res.value() * 4;
 
-  auto nb_rx_res = readReg(m_rx_reg_offset + DICE_REGISTER_RX_NB_RX);
+  auto nb_rx_res = readReg(m_rx_reg_offset + DICE_REGISTER_RX_NUMBER_RX_OFFSET);
   if (!nb_rx_res) {
     spdlog::error("Could not initialize m_nb_rx");
     return std::unexpected(nb_rx_res.error());
   }
   m_nb_rx = nb_rx_res.value();
 
-  auto rx_size_param_res = readReg(m_rx_reg_offset + DICE_REGISTER_RX_SZ_RX);
+  auto rx_size_param_res =
+      readReg(m_rx_reg_offset + DICE_REGISTER_RX_SIZE_RX_OFFSET);
   if (!rx_size_param_res) {
     spdlog::error("Could not initialize m_rx_size");
     return std::unexpected(rx_size_param_res.error());
@@ -1238,7 +1314,7 @@ DiceAudioDevice::splitNameString(const std::string &in) {
 std::vector<std::string> DiceAudioDevice::getTxNameString(unsigned int i) {
   char nameBuffer[DICE_TX_NAMES_SIZE];
   std::expected<std::vector<uint32_t>, IOKitError> readResult =
-      readTxRegBlock(i, DICE_REGISTER_TX_NAMES_BASE, DICE_TX_NAMES_SIZE);
+      readTxRegBlock(i, DICE_REGISTER_TX_NAMES_BASE_OFFSET, DICE_TX_NAMES_SIZE);
   if (!readResult) {
     spdlog::error("Failed to read TX name string for index {}: {}", i,
                   static_cast<int>(readResult.error()));
@@ -1255,7 +1331,7 @@ std::vector<std::string> DiceAudioDevice::getTxNameString(unsigned int i) {
 std::vector<std::string> DiceAudioDevice::getRxNameString(unsigned int i) {
   char nameBuffer[DICE_RX_NAMES_SIZE];
   std::expected<std::vector<uint32_t>, IOKitError> readResult =
-      readRxRegBlock(i, DICE_REGISTER_RX_NAMES_BASE, DICE_RX_NAMES_SIZE);
+      readRxRegBlock(i, DICE_REGISTER_RX_NAMES_BASE_OFFSET, DICE_RX_NAMES_SIZE);
   if (!readResult) {
     spdlog::error("Failed to read RX name string for index {}: {}", i,
                   static_cast<int>(readResult.error()));
@@ -1272,7 +1348,7 @@ std::vector<std::string> DiceAudioDevice::getRxNameString(unsigned int i) {
 std::vector<std::string> DiceAudioDevice::getClockSourceNameString() {
   char nameBuffer[DICE_CLOCKSOURCENAMES_SIZE];
   std::expected<std::vector<uint32_t>, IOKitError> readResult =
-      readGlobalRegBlock(DICE_REGISTER_GLOBAL_CLOCKSOURCENAMES,
+      readGlobalRegBlock(DICE_REGISTER_GLOBAL_CLOCKSOURCENAMES_OFFSET,
                          DICE_CLOCKSOURCENAMES_SIZE);
   if (!readResult) {
     spdlog::error("Failed to read clock source name string: {}",
