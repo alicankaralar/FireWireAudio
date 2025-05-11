@@ -274,8 +274,9 @@ private:
   // ---- NEW MEMBERS ----
   uint32_t vendorID_ = 0;
   uint32_t modelID_ = 0;
-  bool hasAvcCapability_ = false; // Flag indicating if device has AVC capability
-  bool hasDICESupport_ = false;   // Flag indicating if device has DICE support
+  bool hasAvcCapability_ =
+      false;                    // Flag indicating if device has AVC capability
+  bool hasDICESupport_ = false; // Flag indicating if device has DICE support
   // -------------------
 
   // --- NEW PRIVATE HELPERS ---
