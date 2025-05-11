@@ -15,11 +15,11 @@
 #include <utility> // Added for std::expected
 
 #include "FWA/AudioDevice.h"
-#include "FWA/dice/DiceAudioDevice.h"    // Include DiceAudioDevice header
 #include "FWA/DeviceController.h"        // Include full definition
 #include "FWA/DeviceDiscoverySolution.h" // Include for DICE device detection
 #include "FWA/Error.h"
 #include "FWA/Helpers.h"
+#include "FWA/dice/DiceAudioDevice.h" // Include DiceAudioDevice header
 
 namespace FWA {
 
@@ -248,23 +248,24 @@ void IOKitFireWireDeviceDiscovery::deviceAdded(void *refCon,
     }
 
     // Test if this is a DICE device by trying to read DICE registers
-    bool isDiceDevice = FWA::DeviceDiscoverySolution::IsDiceDevice(deviceInterface);
+    bool isDiceDevice =
+        FWA::DeviceDiscoverySolution::IsDiceDevice(deviceInterface);
 
     // Release the temporary device interface used for IsDiceDevice check
     (*deviceInterface)->Release(deviceInterface);
     deviceInterface = nullptr; // Nullify pointer after release
 
-    if (!isDiceDevice)
-    {
-        spdlog::info("deviceAdded: Device is not a DICE device - skipping");
-        IOObjectRelease(device_service);
-        continue;
+    if (!isDiceDevice) {
+      spdlog::info("deviceAdded: Device is not a DICE device - skipping");
+      IOObjectRelease(device_service);
+      continue;
     }
 
     // If we get here, this is a DICE device!
     spdlog::info("deviceAdded: DICE device detected! Configuring...");
 
-    // --- Extract Device Name and Vendor Name directly from device_service properties ---
+    // --- Extract Device Name and Vendor Name directly from device_service
+    // properties ---
     std::string deviceName = "Unknown Device";
     std::string vendorName = "Unknown Vendor";
     CFMutableDictionaryRef deviceProps = nullptr;
@@ -292,43 +293,46 @@ void IOKitFireWireDeviceDiscovery::deviceAdded(void *refCon,
     // --- Create appropriate device type based on DICE detection ---
     std::shared_ptr<AudioDevice> newAudioDevice = nullptr;
     try {
-        // Create DiceAudioDevice since we confirmed it's a DICE device
-        spdlog::info("deviceAdded: Creating DiceAudioDevice for GUID 0x{:x}", guid);
-        newAudioDevice = std::make_shared<DiceAudioDevice>(
-            guid, deviceName, vendorName, device_service,
-            self->deviceController_.get());
+      // Create DiceAudioDevice since we confirmed it's a DICE device
+      spdlog::info("deviceAdded: Creating DiceAudioDevice for GUID 0x{:x}",
+                   guid);
+      newAudioDevice = std::make_shared<DiceAudioDevice>(
+          guid, deviceName, vendorName, device_service,
+          self->deviceController_.get());
     } catch (const std::bad_alloc &e) {
-        spdlog::critical("deviceAdded: Failed to allocate memory for DiceAudioDevice "
-                         "(GUID: 0x{:x}): {}",
-                         guid, e.what());
-        newAudioDevice = nullptr; // Ensure it's null
+      spdlog::critical(
+          "deviceAdded: Failed to allocate memory for DiceAudioDevice "
+          "(GUID: 0x{:x}): {}",
+          guid, e.what());
+      newAudioDevice = nullptr; // Ensure it's null
     } catch (...) {
-        spdlog::critical("deviceAdded: Unknown exception during DiceAudioDevice "
-                         "creation (GUID: 0x{:x})",
-                         guid);
-        newAudioDevice = nullptr; // Ensure it's null
+      spdlog::critical("deviceAdded: Unknown exception during DiceAudioDevice "
+                       "creation (GUID: 0x{:x})",
+                       guid);
+      newAudioDevice = nullptr; // Ensure it's null
     }
 
     if (!newAudioDevice) {
-        spdlog::error(
-            "deviceAdded: Failed to create DiceAudioDevice instance for GUID 0x{:x}",
-            guid);
-        // Release the io_service_t reference obtained from the iterator if
-        // creation failed
-        IOObjectRelease(device_service);
-        continue; // Skip to the next device
+      spdlog::error("deviceAdded: Failed to create DiceAudioDevice instance "
+                    "for GUID 0x{:x}",
+                    guid);
+      // Release the io_service_t reference obtained from the iterator if
+      // creation failed
+      IOObjectRelease(device_service);
+      continue; // Skip to the next device
     }
 
     // --- Initialize the created DiceAudioDevice ---
     auto initResult = newAudioDevice->init();
     if (!initResult) {
-        spdlog::error("deviceAdded: Failed to initialize DiceAudioDevice for GUID "
-                      "0x{:x}: 0x{:x}",
-                      guid, static_cast<int>(initResult.error()));
-        // DiceAudioDevice destructor will handle releasing retained IO objects
-        // Release the io_service_t reference obtained from the iterator
-        IOObjectRelease(device_service);
-        continue; // Skip to the next device
+      spdlog::error(
+          "deviceAdded: Failed to initialize DiceAudioDevice for GUID "
+          "0x{:x}: 0x{:x}",
+          guid, static_cast<int>(initResult.error()));
+      // DiceAudioDevice destructor will handle releasing retained IO objects
+      // Release the io_service_t reference obtained from the iterator
+      IOObjectRelease(device_service);
+      continue; // Skip to the next device
     }
 
     spdlog::info("deviceAdded: DiceAudioDevice created and initialized "
